@@ -1,0 +1,1642 @@
+---
+title: "Regresión logística en R"
+subtitle: "Descripción de resultados, empleando datos presentes en Osborne (2012)"
+toc: true
+toc-expand: true
+toc-title: Contenidos
+author:
+  - name: https://dacarras.github.io/
+    affiliations:
+    - name: Centro de Medición MIDE UC, Pontificia Universidad Católica de Chile
+format:
+  html:
+    code-overflow: wrap
+    code-line-numbers: true
+    code-annotations: below
+    code-link: true
+    embed-resources: true
+    grid:
+      margin-width: 400px
+css: output_background_color_style.css
+mainfont: Noto Sans
+monofont: Source Code Pro
+---
+
+```{r, echo = FALSE, eval = TRUE}
+
+# hide messages from dplyr
+suppressPackageStartupMessages(library(dplyr))
+
+# hide NA from knitr table
+options(knitr.kable.NA = '')
+
+# suppress dplyr group warnings
+options(dplyr.summarise.inform = FALSE)
+
+```
+
+# Introducción
+
+El presente documento ilustra cómo describir resulados de regresión logística, empleando los datos y resultados presentes en Osborne (2012):
+
+>Osborne, J. W. (2012). Logits and tigers and bears , oh my! A brief look at the simple math of logistic regression and how it can improve dissemination of results. Practical Assessment, Research and Evaluation, 17(June 2012), pp. 1–10.
+
+En el articulo de Osborne (2012) se emplean datos del estudio NELS88 (https://nces.ed.gov/surveys/nels88/) de 1988, en el cal se siguen a estudiantes de 8vo grado (14 años aproximadamente), hasta el momento de graduación. Y con estos datos se distingue entre estudiantes que completan sus estudios y se graduan, en contraste a los estudiantes que interrumpen su trayectoria escolar. En resumen, la variable de respuesta, o variable dependiente, que se emplea se llama `dropout`. En esta se codifica como cero a los estudiantes que se graduan (i.e., completan la secundaria), y como uno a los estudiantes que interrumpen su trayectoria escolar. 
+
+Los datos que se emplean en la present guía, pueden ser obtenidos empleando el siguiente link:
+
+- [https://www.dropbox.com/s/s1y0qkn8vuebqvr/NELS_data_pulll_2.SAV?dl=0](https://www.dropbox.com/s/s1y0qkn8vuebqvr/NELS_data_pulll_2.SAV?dl=0)
+
+
+Para describir los resultados, se siguen cómo guía a las recomendaciones presentes en Huck (XXXX), O'Connel et al. (2016), y las observaciones Niu (2020).
+
+
+# Flujo de trabajo
+
+Para reproducir los resultados que el autor incluye en el artículo revisado (Osborne, 2012), vamos a seguir un flujo de trabajo reproducible. Un flujo de trabajo reproducible consiste en un código que pueda ser ejecutado de forma tal, que genere los mismos resultados cada vez que sea ejecutado. Adicionalmente, este tipo de flujo contempla que todos los códigos aplicados puedan ser ejecutados en secuencia, sin producir errores en la sencuencia creada. Y finalmente, este tipo de código debe crear un documento dinámico que registra los resultados generados.
+
+El presente documento es generado con un código reproducible, que puede ser ejecutado en [R Studio](https://posit.co/download/rstudio-desktop/), o en cualquier otro editor que pueda leer un código de `R` escrito en formato [quarto](https://quarto.org/), tales como [Sublime Text](https://www.sublimetext.com/), [Visual Studio Code](https://code.visualstudio.com/), entre otros.
+
+Las secciones que incluye este documento son:
+
+- Abrir datos
+
+- Tabla 1: Descriptivos
+
+- Formulas de logits y odds
+
+- Tabla 4: Modelo con un predictor
+
+- Formulas de odds ratio
+
+- Tabla 5: Modelo con varios predictores
+
+- Tabla 6: Tabla de resultados esperados
+
+- Figura 2: Interación en logits
+
+- Figura 3: Probabilidades observadas
+
+- Figura 4: Probabilidades esperadas
+
+Cada una de estas secciones es incluida en este documento como titulos, y bajo cada una de estas secciones se incluyen diferentes subsecciones. Al interior de cada una de las secciones, se incluyen códigos anotados.
+
+El presente documento emplea a los fonts [Noto Sans](https://fonts.google.com/noto/specimen/Noto+Sans+JP?query=Noto+Sans+JP) para el texto, y a [Source Code Pro](https://fonts.google.com/specimen/Source+Code+Pro) para los códigos.
+
+
+# Abrir datos
+
+Podemos abrir los datos de dos maneras:
+
+a. podemos abrir los datos directamente desde un link, si contamos con una conexión a internet.
+
+b. podemos abrir el archivo de datos de forma directa en el código, si hemos guardado previamente el archivo en el computador que nos encontramos ocupando.
+
+
+## Desde URL
+
+**Código 1.** Abrir los datos desde URL
+
+```{r, echo = TRUE, eval = FALSE}
+
+# crear objeto con la ubicación de los datos
+file_url <- 'https://www.dropbox.com/s/s1y0qkn8vuebqvr/NELS_data_pulll_2.SAV?dl=1' # <1>
+
+# abrir los datos empleando haven
+data_nels <- haven::read_sav(file_url) # <2>
+
+# inspeccionar datos cargados en R
+dplyr::glimpse(data_nels)              # <3>
+
+
+```
+1. Creamos un objeto con la dirección de los datos como una URL directa. Para R, este texto es solo la ubicación lógica del archivo vamos a emplear. Esta podría ser reemplazada por una dirección en una carpeta.
+
+2. Abrimos los datos empleando la librería "haven". Empleamos `haven::read_sav()` para abrir el archivo que esta empleando el autor. Asignamos los datos abiertos al objeto `data_nels`, para emplear la tabla de datos que creamos en sesión.
+
+3. Luego, aplicamos la función `dplyr::glimpse(data_nels)` para tener una panorámica de los datos que vamos a ocupar.
+
+
+## Desde el computador
+
+
+**Código 2.** Abrir los datos desde el computador.
+
+```{r, echo = TRUE, eval = FALSE}
+
+# abrir datos en formato SPSS
+data_nels <- haven::read_sav('NELS_data_pulll_2.sav') # <1>
+
+# inspeccionar datos cargados en R
+dplyr::glimpse(data_nels)
+
+```
+
+1. A diferencia del código anterior, en este caso indicamos sólo el nombre del archivo, que presupone que el código y el archivo se encuentran en la carpeta de trabajo de R. Para verificar que se encuentran en la misma carpeta podemos ocupar el comando `getwd()`, el cual nos indica cuál es el directorio de trabajo de la consola de R.
+
+
+El resultado en consola, tanto del **Código 1** como del **Código 2**, es el siguiente:
+
+```{r, echo = FALSE, eval = TRUE}
+
+# crear objeto con la ubicación de los datos
+file_url <- 'https://www.dropbox.com/s/s1y0qkn8vuebqvr/NELS_data_pulll_2.SAV?dl=1' # <1>
+
+# abrir los datos empleando haven
+data_nels <- haven::read_sav(file_url) # <2>
+
+# inspeccionar datos cargados en R
+dplyr::glimpse(data_nels)              # <3>
+
+```
+
+# Tabla 1: Descriptivos
+
+Una buena práctica durante el ejercicio de ajustar modelos, como la reegresión logística es producir resultados descriptivos. En el caso Osborne (2012), el autor emplea la Tabla 1 para estos propósitos. Esta tabla, es una tabla cruzada o tabla de contingencia de 2x2. En esta se incluye a la frecuencia de valores en cada celda, para la variable `poor` y la variable `dropout`. Cada una de estas variables solo posee dos valores cero y uno. 
+
+![Table 1: Crosstabulation of family income and students dropout](Osborne_2012_table_1.jpg){width=400px fig-align="center"}
+
+La racionalidad de esta tabla, es que permite ilustrar para los lectores cuál es la proporción de estudiantes que interrumpe su trayectoria escolar, y no se gradua de secundaria condicional a los ingresos familiares.
+
+Adicionalmente, esta tabla incluye no solo la frecuencia de valores cruzada de ambos factores, sino que además agrega las probabilidades condicionales del evento de interés, así como los "odds ratio".
+
+>**Odds ratio**: los odds ratio son razones de proporciones, o divisiones de proporciones entre sí. Permite indican cuan grande son las proporciones de un evento, en contraste a una proporción de referencia del mismo evento. Los Odds ratio, tambien son llamados *razón de posibilidades*, o *razón de momios* en español. A lo largo del presente documento nos vamos a referir a estos como *odds ratio*.
+
+## Tabla cruzada de descriptivos
+
+Para crear una tabla cruzada simple, podemos emplear la función `xtabs()`.
+
+**Código 3.** Tabla cruzada de deserción (dropout), e ingreso familiar.
+
+```{r, echo = TRUE, eval = FALSE}
+
+
+# tabla cruzada básica
+xtabs(~ poor + dropout, data = data_nels) # <1>
+
+
+```
+
+1. Ocupamos la función `xtabs`, para crear una tabla cruzada. Esta función sigue la lógica de cruzar la variable de respuesta de interés, cruzada por la covariable de interés de la siguiente forma: `xtabs(~ covariable + variable_de_respuesta, data = datos_de_interes)`.
+
+
+El resultado del codigo anterior, debiera aparecer de la siguiente forma:
+
+```{r, echo = FALSE, eval = TRUE}
+
+
+# tabla cruzada básica
+xtabs(~ poor + dropout, data = data_nels) # <3>
+
+
+```
+
+
+## Tabla cruzada con información adicional.
+
+El siguiente código permite reproducir la **Tabla 1** de Osborne (2012). Para poder producir todas las cifras presentes en esta tabla se requieren varios pasos. El siguiente código no es la única manera de producir esta tabla, si no que es **una manera** entre varias otras, que se puede emplear para producir esta tabla.
+
+El código comienza con la creación de una tabla de frecuencias para dos variables de forma conjunta, empleando a la función `dplyr::count()`. Luego esta tabla inicial es reorganizada para que tome la forma de una tabla cruzada de 2x2, empleando a la función `tidyr::pivot_wider`. Y luego, se incluyen una serie de operaciones para incluir las cifras adicionales que la función `xtabs` no produce por si sola, como los totales, las probabilidades condicionales, y los odds ratio de la tabla 1.
+
+Cada una de los pasos empleados, desde el paso 1 al paso 17, son comentados para indicar porque se incluye cada una de las líneas de código escritas. 
+
+**Código 4.** Tabla cruzada de deserción (dropout), e ingreso familiar
+
+```{r, echo = TRUE, eval = FALSE}
+
+
+# tabla cruzada con información adicional
+
+# abrimos library(dplyr)
+library(dplyr)                                                 # <1>
+
+# crear primera porcion de tabla 1
+table_1a <- dplyr::count(data_nels, poor, dropout) %>%         # <2>
+tidyr::pivot_wider(names_from = dropout, values_from = n) %>%  # <3>
+mutate(poor = case_when(                                       # <4>
+poor == 1 ~ 'poor_yes',                                        # <4>
+poor == 0 ~ 'poor_no'                                          # <4>
+)) %>%                                                         # <4>
+rename(drop_no = `0`, drop_yes = `1`) %>%                      # <5>
+arrange(desc(poor)) %>%                                        # <6>
+rowwise() %>%                                                  # <7>
+mutate(total = sum(drop_no, drop_yes)) %>%                     # <7>
+ungroup() %>%                                                  # <7>
+mutate(conditional_prob = drop_yes/total) %>%                  # <8>
+mutate(odds = conditional_prob/(1-conditional_prob)) %>%       # <9>
+mutate(odds_ratio = odds/dplyr::lead(odds))                    # <10>
+
+# crear fila de totales de tabla 1
+table_1b <- data.frame(                                        # <11>
+poor     = 'total',                                            # <12>
+drop_no  = sum(table_1a['drop_no']),                           # <13>
+drop_yes = sum(table_1a['drop_yes']),                          # <14>
+total    = sum(table_1a['total'])                              # <15>
+) 
+
+# juntar ambas partes
+table_1 <- dplyr::bind_rows(table_1a, table_1b)                # <16>
+
+# mostrar tabla 1
+knitr::kable(table_1, digits = 3)                              # <17>
+
+```
+1. Abrimos la libreria `dplyr` para poder ocupar los comandos `%>%` y así poder encadenar funciones y resultados.
+2. Creamos una tabla que produce los valores cruzados.
+3. Rotamos la tabla, de modo tal que las frecuencias se re-agrupen como una tabla cruzada
+4. Renombramos los valores numericos de `poor` a texto de modo tal que `poor == 1` sea `poor_yes`, y que `poor == 0` sea `poor_no`.
+5. Renombramos los nombres de las columnas de drop, que originalmente quedan como `0` y `1`, y les cambiamos los nombres a que sean `drop_no`, y `drop_yes` respectivamente.
+6. Reordenamos los valores de poor, de modo que aparezca `poor_yes` primero, y luego `poor_no`
+7. Aplicamos `rowwise()` a toda la tabla, para poder crear el total de suma de valores de cada fila. Luego aplicamos `mutate(total = sum(drop_no, drop_yes))`, código que nos va a sumar las celdas de la tabla cruzada. Finalmente, cerramos la operación con `ungroup`, para que R pueda seguir realizando las operaciones en su modo por defecto.
+8. Calculamos las probabilidades condicionales del evento de la variable de respuesta. Es decir que, generamos la proporción de estudiantes que deserta de la escuela, condicional a los valores de `poor`.
+9. Calculamos las chances u **odds**, la cual es la cantidad de veces en que el evento (deserción) se encuentra por sobre su inverso (la proporción del no evento, la retención). La formula general de los odds es $p/q$, donde p es $Pr(y=1)$, y donde $q$ es $1 - Pr(y=1)$.
+10. Teniendo a los odds del evento, podemos calcular los **odds ratio**, esta es una razón que nos indica que tan grande son las chances de que los estudiantes de familias de menores ingresos (bajo el promedio del ingreso familiar el país, `poor == 1`), en contraste a los estudiantes que desertan, pero que provienen de familias de mayores ingresos (sobre el promedio del ingreso familiar el país, `poor == 0`)(ver Osborne, 2015, p21).
+11. Creamos la fila de totales de la tabla, como el objeto `table_1b`.
+12. Creamos el campo `total` dentro de la variable `poor`
+13. Sumamos los valores de la columna `drop_no` de la `table_1a`
+14. Sumamos los valores de la columna `drop_yes` de la `table_1a`
+15. Sumamos los valores de la columna `total` de la `table_1a`
+16. Unimos las dos tablas parciales empleando la función `dplyr::bind_rows()`
+17. Podemos desplegar el resultado empleando a `knitr::kable()` para que la tabla generada, se vea como una tabla estructurada en consola.
+
+
+Con todos los pasos anteriores, podemos producir la tabla 1, obteniendo como a la siguiente tabla como resultado en consola:
+
+```{r, echo = FALSE, eval = TRUE}
+
+
+# tabla cruzada básica
+
+# abrimos library(dplyr)
+library(dplyr)                                                 # <1>
+
+# crear primera porcion de tabla 1
+table_1a <- dplyr::count(data_nels, poor, dropout) %>%         # <2>
+tidyr::pivot_wider(names_from = dropout, values_from = n) %>%  # <3>
+mutate(poor = case_when(                                       # <4>
+poor == 1 ~ 'poor_yes',                                        # <4>
+poor == 0 ~ 'poor_no'                                          # <4>
+)) %>%                                                         # <4>
+rename(drop_no = `0`, drop_yes = `1`) %>%                      # <5>
+arrange(desc(poor)) %>%                                        # <6>
+rowwise() %>%                                                  # <7>
+mutate(total = sum(drop_no, drop_yes)) %>%                     # <7>
+ungroup() %>%                                                  # <7>
+mutate(conditional_prob = drop_yes/total) %>%                  # <8>
+mutate(odds = conditional_prob/(1-conditional_prob)) %>%       # <9>
+mutate(odds_ratio = odds/dplyr::lead(odds))                    # <10>
+
+# crear fila de totales de tabla 1
+table_1b <- data.frame(                                        # <11>
+poor     = 'total',                                            # <12>
+drop_no  = sum(table_1a['drop_no']),                           # <13>
+drop_yes = sum(table_1a['drop_yes']),                          # <14>
+total    = sum(table_1a['total'])                              # <15>
+) 
+
+# juntar ambas partes
+table_1 <- dplyr::bind_rows(table_1a, table_1b)                # <16>
+
+# mostrar tabla 1
+knitr::kable(table_1, digits = 3)                              # <17>
+
+```
+
+## Tasa de prevalencia del evento
+
+A la base del uso de los modelos de regresión logística, se encuentran las proporciones del evento que queremos representar mediante el modelo, es decir $Pr(y=1)$. En términos generales, nos referimos a esta proporación como la tasa de prevalencia del evento de interés. El evento en este caso, refiere a la cantidad de estudiantes que no se ha graduado, a pesar de iniciar sus estudios en 1988, y luego de 12 años no ha concluido sus estudios secundarios (ver: https://nces.ed.gov/surveys/nels88/).
+
+
+::: {.callout-note title="Nota"}
+Prevalencia, refiere en general a la cantidad de personas que personas que presenta un atributo o condición. Es un término empleado de forma general en estadísticas de salud y medicina para referirse a la la cantidad de personas que presenta o padeció una enfermedad. Es común, que en estudios de deserción escolar, y de otras literaturas referidas a eventos que toman valores de presencia y ausencia, el término prevalencia tambien sea empleado. Por ejemplo en el documento de trabajo "Deserción escolar: diagnóstico y proyección en tiempos de pandemia" (CEM, 2020) se habla de "tasa de prevalencia", para referirse a la proporción de estudiantes en un rango etario que sin haber egresado de 4° medio, no asiste a algún establecimiento educacional en un momento dado, excluyendo a quienes nunca han asistido a la educación formal.
+:::
+
+En Osborne (2012), el evento de interés $p$ es la cantidad de estudiantes del total que no se ha graduado. Complemtariamente, tambien tenemos a $q$ o $1-p$, el cual consiste en el conjunto de estudiantes que no presenta el evento de interés (i.e., el conjunto de estudiantes que sí sea ha graduado).
+
+
+En Osborne (2012) $p = 1477$, y el total es $total = 16610$. De esta manera $P_{dropout}$ es:
+
+$$P_{dropout} = \frac{1477}{16610}$$
+
+$$P_{dropout} = 0.0889$$
+
+La cifra complementaria a la anterior, es obtener la proporción de estudiantes que no presenta el evento:
+
+$$1 - P_{dropout} = \frac{15133}{16610}$$
+
+$$1 - P_{dropout} = 0.9111$$
+
+::: {.callout-note title="Nota"}
+Para que tengamos un poco de contexto comparativo, en Chile la tasa de prevalencia de la deserción escolar para los estudiantes de 14 a 17 años, es de 3.9% en 2019 (CEM, 2020). En términos de odds ratio, los resultados revisados en Osborne (2012) son 2.27 más grandes que los observados en Chile.
+:::
+
+Podemos realizar las operaciones anteriores mediante Código 5.
+
+**Código 5.** Tasa de prevalencia empleando cifras totales.
+
+```{r, echo = TRUE, eval = FALSE}
+
+# prorporción de desersción y retención
+
+## cantidad de casos que presenta el evento (desersión)
+y_p   <- 1477
+
+## cantidad de casos que que no presenta el evento (retención)
+y_q   <- 15133
+
+## cantidad total de casos
+y_tot <- 16610
+
+## proporción de desersión entre las observaciones
+prob_p  <- y_p/y_tot
+prob_p # text aqui
+
+## proporción de retención entre las observaciones
+prob_q  <- y_q/y_tot
+prob_q
+
+```
+
+Los códigos anteriores, nos entregan los siguientes resultados para `prob_p`:
+
+```{r, echo = FALSE, eval = TRUE}
+
+# prorporción de desersción y retencion
+
+## cantidad de casos que presenta el evento (desersión)
+y_p   <- 1477
+
+## cantidad de casos que que no presenta el evento (retención)
+y_q   <- 15133
+
+## cantidad total de casos
+y_tot <- 16610
+
+## proporción de desersión entre las observaciones
+prob_p  <- y_p/y_tot
+prob_p
+
+```
+
+Y el siguiente es el resultado para el objeto `prob_q`:
+
+```{r, echo = FALSE, eval = TRUE}
+
+# prorporción de desersción y retencion
+
+## cantidad de casos que presenta el evento (desersión)
+y_p   <- 1477
+
+## cantidad de casos que que no presenta el evento (retención)
+y_q   <- 15133
+
+## cantidad total de casos
+y_tot <- 16610
+
+## proporción de retención entre las observaciones
+prob_q  <- y_q/y_tot
+prob_q
+
+```
+::: {.callout-important title="Importante"}
+Los resultados generados por Osborne (2012) son solo ilustrativos, ya que los resultados generados ignoran la probabilidad de selección de las observaciones del estudio. Los datos de NELS88 provienen de una muestra probabilística, o muestra de diseño complejo, la cual posee diferentes aspectos que pueden ser incluidos en el cálculo de resultados para producir cifras como proporciones y totales, que refieran al marco muestral empleado en el estudio (ver Osborne, 2015, p21; y Osborne, 2011).
+:::
+
+# Formulas de logits y odds
+
+## Modelo nulo y prevalencia del evento
+
+Podemos emplear el modelo nulo de la regresión logística, para obtener $Pr(y=1)$. Para realizar esta operación necesitamos ajustar el siguiente modelo:
+
+$$ln[Pr(y_{i} = 1)] = \hat{\beta}_{0}$$
+
+Este es el modelo de regresión logística nulo. El modelo nulo es un modelo de regresión logística donde solo tenemos un intercepto $\hat{\beta}_{0}$, y no incluimos ningún predictor. De forma analoga, como en el modelo de regresión nulo lo único que se estima es la media, en el caso de la regresión logística, el intercepto del modelo nulo nos entrega un estimado que nos permite llegar a $Pr(y=1)$.
+
+Ajustemos del modelo de regresión logística nulo, y veamos su salida en R.
+
+
+**Código 6.** Modelo nulo de regresión logística sobre `dropout`.
+
+```{r, echo = TRUE, eval = TRUE}
+
+# output
+glm(dropout ~ 1, data = data_nels, family = "binomial") %>%
+summary()
+
+
+```
+
+## Output anotado: **modelo nulo**
+
+El resultado del código anterior, nos entrega diferentes piezas de información. Vamos a anotar las piezas más relevantes de esta salida.
+
+**Output 1**. Salida del modelo nulo.
+
+```{r}
+#| echo: TRUE
+#| eval: FALSE
+#| comment: '#'
+
+# Call:
+# glm(formula = dropout ~ 1, family = "binomial", data = data_nels)  # <1>
+# 
+# Deviance Residuals:                                                # <2>
+#     Min       1Q   Median       3Q      Max                        # <2>
+# -0.4316  -0.4316  -0.4316  -0.4316   2.2000                        # <2>
+# 
+# Coefficients:                                                      # <3> 
+#             Estimate Std. Error z value Pr(>|z|)                   # <3>
+# (Intercept) -2.32686    0.02726  -85.36   <2e-16 ***               # <3>
+# ---
+# Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1     # <4>
+# 
+# (Dispersion parameter for binomial family taken to be 1)
+# 
+#     Null deviance: 9967.2  on 16609  degrees of freedom            # <5>
+# Residual deviance: 9967.2  on 16609  degrees of freedom            # <6>
+# AIC: 9969.2                                                        # <7>
+```
+1. Esta línea contiene el código del modelo ajustado.
+
+2. Estas líneas nos entregan los descriptivos de los residuales del modelo. Estos se encuentran en unidades de *deviance* o *devianza*. Mientras más grande sean estos numeros, se interpreta que el modelo ajusta menos a los datos observados.
+
+3. Esta sección contiene los resultados de interés del modelo. Bajo la columna de `Estimate` se encuentra al interpecepto del modelo que hemos llamado $\hat{\beta}_{0}$. Este estimado se encuentra acompañado de un error estandar, bajo la columna de `Std. Error`. Y además, se encuentra acompañado de un estadístico que es la division del estimado por su error estándar. Este estadístico se le suele llamar z-test o **Wald statistic** ($W$). Este estadístico sige una distribucion $\chi^2$ de un solo grado de libertad, que puede ser escrita de la siguiente forma $\chi_{1}^2$. Empleando los valores de $W$, y la distribucion de $\chi_{1}^2$ se puede calcular el valor p (`Pr(>|z|)`). Este valor nos indica que tan típico el valor obtenido, en la distribución de todo los valores posibles en un modelo donde $Pr(y=1) = .50$.
+
+4. Esta línea indica como el output clasifica a los resultados obtenidos según su valor p obtenido. cuando estos son menores a .001, se marcan con `***`; cuando son menores a .01 se marcan como `**`, y cuando son menores a .05 se marcan como `*`. Para el caso en que los resultados obsevados fueran mayores a .05 (i.e., no significativos), no se marcan.
+
+5. En esta línea el output de R nos entrega la devianza nula del modelo.
+
+6. En esta siguiente línea el output de R nos entrega la devianza total del modelo, la cual es igual a la anterior, porque el modelo ajustado no incluye predictores.
+
+7. Finalmente, el output entrega al AIC, el cual es un indicador de ajusta llamado Akaike Information Criterion, el cual es consiste en la devianza del modelo, más el doble de la cantidad de parámetros ajustados en el modelo. En este caso es la desvianza más 2. Mientras menor sea el AIC de un modelo, en contraste a otro modelo diferente, se interpreta que el modelo de menor AIC ajusta mejor a los datos observados.
+
+
+## Prevalencia e intercepto del modelo nulo
+
+Podemos ocupar el intercepto del modelo nulo para obtener la tasa de prevalencia del evento de interés. En otras palabras, podemos ocupar el estimado de $\hat{\beta}_{0}$, para calular la proporción de estudiantes que no se ha graduado.
+
+Empleando los resultados de este modelo, vamos a obtener a $\hat{\beta}_{0}$ en escala de logits. Empleando la formula de conversión de logits a probabilidades, podemos obtener la tasa de prevalencia de la deserción escolar para los estudiantes de 1988. Esta formula es la siguiente:
+
+
+$$Pr(y_{i} = 1) = \frac{\exp(\hat{\beta}_{0})}{1 + \exp(\hat{\beta}_{0})}$$
+
+Otra forma de expresar la misma formula, es la siguiente:
+
+$$Pr(y_{i} = 1) = \frac{1}{1 + \exp(-\hat{\beta}_{0})}$$
+
+Ambas ecuaciones nos llevan a los mismos resultados. A continuación, en el **Código 7** incluimos a ambas ecuaciones para producir los resultados esperados por el modelo nulo.
+
+**Código 7.** Estimación de la tasa de prevalencia empleando a los resultados del modelo.
+
+```{r, echo = TRUE, eval = FALSE}
+
+# empleamos el intercepto del modelo nulo de regresión logística
+# para obtener la tasa de prevalencia
+glm(dropout ~ 1, data = data_nels, family = "binomial") %>%        # <1>
+broom::tidy() %>%                                                  # <2>
+mutate(eq_1_pr_y = exp(estimate) / (1 + exp(estimate))) %>%        # <3>
+mutate(eq_2_pr_y = 1 / (1 + exp(-estimate))) %>%                   # <4>
+knitr::kable(., digits = 4)                                        # <5>
+
+```
+
+1. Ajustamos el modelo nulo.
+2. Empleamos a la librería `broom` y a su función `tidy()` de forma conjunta, `broom::tidy()` para que nos entregue los resultados de los estimados en un objeto tabla.
+3. Ocupamos la formula 1 para calcular las probabilidades esperadas de `dropout`
+4. Ocupamos la segunda formula 2 para calcular las probabilidades esperadas de `dropout`
+5. Ocupamos a `knitr::kable()` para producir una tabla estructurada en la consola.
+
+Con todos los códigos anteriores, podemos producir la siguiente tabla:
+
+```{r, echo = FALSE, eval = TRUE}
+
+# empleamos el intercepto del modelo nulo de regresión logística
+# para obtener la tasa de prevalencia
+glm(dropout ~ 1, data = data_nels, family = "binomial") %>%
+broom::tidy() %>%
+mutate(eq_1_pr_y = 1 / (1 + exp(-estimate))) %>%
+mutate(eq_2_pr_y = exp(estimate) / (1 + exp(estimate))) %>%
+knitr::kable(., digits = 4)
+
+
+```
+
+En la tabla anterior `eq_1_pr_y` y `eq_2_pr_y` nos entregan a $P_{dropout} = 0.0889$.
+
+## Probabilidades, odds y logits
+
+En la sección anterior hemos visto que empleando la formula de logit inverso, podemos llegar a las probabilidades esperadas con el modelo nulo.
+
+$$Pr(y_{i} = 1) = \frac{1}{1 + \exp(-\hat{\beta}_{0})}$$
+
+
+En términos generales, los odds consisten en la razon entre el evento de interés $Pr(y_{1}=1)$, y su complementario $Pr(y_{1}=0)$, o $1 - Pr(y_{1}=1)$.
+
+$$Odds = \frac{Pr}{1 - Pr}$$
+
+Inversamente, podemos convertir los odds de una proporción o probabilidad a probabilides.
+
+$$Pr = \frac{odds}{1 + odds}$$
+
+Finalmente, podemos convertir los logits del intercepto a odds de un modelo nulo con la siguiente formula:
+
+$odds = exp(\hat{\beta}_{0})$
+
+En términos generales, un modelo de regresión logística es un modelo que se aplica sobre los odds, en escala de logits, es un modelo de log odds o logits. A continuación, incluimos una tabla de que transforma probabilidades de .001 a .999 a odds, y luego a logits empleando las formulas anteriores.
+
+```{r, echo = TRUE, eval = TRUE}
+#| code-fold: true
+#| code-summary: "Código tabla prob, logits, odds"
+
+# aumentar cantidad de decimales en consola
+options(scipen = 99)
+options(digits = 5)
+library(dplyr)
+
+# crear tabla
+data_prob <- data.frame(
+prob = c(.001, 0.01, seq(.100,.900,0.100), .99, .999)
+) %>%
+mutate(prob = as.numeric(prob)) %>%
+mutate(odds = prob/(1-prob)) %>%
+mutate(logits = log(odds)) %>%
+dplyr::select(prob, logits, odds)
+
+# mostrar tabla
+knitr::kable(data_prob, digits = 4)
+
+```
+
+Nótese que una probabilidad de .50, es decir donde la mitad de las observaciones posee al evento de interés, es equivalente a un logit de 0. Y por su parte, esto es equivalente a un odds de 1.
+
+En los modelos de regresión logística, un logit de cero, es nuestro punto de referencia para producir inferencias con los estimados. Indicamos que un estimado es *significativo*, si se encuentra los suficientemente *lejos* de este punto de referencia.
+
+En cambio, un estimado que en odds, que fuera cercano a 1, es un estimado que se encuentra muy cerca del punto de referencia de un $Pr = .5$.
+
+## Relación gráfica logits y probabilidades
+
+Mientras los logits se alejan del cero, a probabilides menores a .5, los logits se hacen más grandes y negativos. Mientras se alejan del cero a probabilidades mayores a .5, los logits se hacen más grandes y positivos. La conversión de valores es simétrica: la distancia que toman los valores desde el .5, hacia mayores valores o hacia menores valores toma la misma distancia en la escala de logíts.
+
+```{r, echo = TRUE, eval = TRUE}
+#| code-fold: true
+#| code-summary: "Código prob x logits"
+
+data_prob_fine <- data.frame(
+prob = c(seq(000,1,0.001))
+) %>%
+mutate(prob = as.numeric(prob)) %>%
+mutate(odds = prob/(1-prob)) %>%
+mutate(logits = log(odds)) %>%
+dplyr::select(prob, logits, odds)
+
+library(ggplot2)
+plot_logit_prob <- ggplot(data_prob_fine, 
+  aes(                                    
+    x = logits,                           
+    y = prob                              
+    )) +                                  
+geom_line() +                             
+geom_point(size=1) +                   
+theme_bw() +                           
+theme(                                 
+  legend.title = element_blank(),      
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.minor.y = element_blank(),
+  panel.grid.major.y =                            
+  element_line(linewidth = .25, colour = "grey70")
+  )                                               
+
+# mostrar plot
+suppressWarnings(print(plot_logit_prob))
+
+```
+## Relación gráfica odds y probabilidades
+
+Por su parte los odds siguen otro patrón con respecto a las probabilidades. Los odds se acercan al cero mientras menor sea la probabilidad a la que representan, y se hacen más positivos a medida que aumenta la probabilidad representada.  La conversión de valores es no es simétrica, y es solo positiva.
+
+A continuación graficamos como se ven los odds con respecto a las probabilidades de $Pr =.5$ a $Pr = 1$.
+
+```{r, echo = TRUE, eval = TRUE}
+#| code-fold: true
+#| code-summary: "Código prob x odds"
+data_prob_fine <- data.frame(
+prob = c(seq(000,1,0.001))
+) %>%
+mutate(prob = as.numeric(prob)) %>%
+mutate(odds = prob/(1-prob)) %>%
+mutate(logits = log(odds)) %>%
+dplyr::select(prob, logits, odds)
+
+library(ggplot2)
+plot_logit_odds <- ggplot(data_prob_fine, 
+  aes(                                    
+    x = odds,                           
+    y = prob                              
+    )) +                                  
+# geom_line() +                             
+geom_point(size=1) +                   
+xlim(c(1,50)) +
+ylim(c(.5,1)) +
+theme_bw() +                           
+theme(                                 
+  legend.title = element_blank(),      
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.minor.y = element_blank(),
+  panel.grid.major.y =                            
+  element_line(linewidth = .25, colour = "grey70")
+  )                                               
+
+# mostrar plot
+suppressWarnings(print(plot_logit_odds))
+
+```
+
+# Tabla 4: Modelo con un predictor
+
+## Modelo ajustado
+
+En la tabla 4, Osborne (2012) incluye los resultados de un modelo con un solo predictor. Este modelo puede ser expresado de la siguiente forma:
+
+$$ln[Pr(y_{i} = 1)] = \hat{\beta}_{0} + \hat{\beta}_{1}x_{i}$$
+
+Si somos más explicitos podemos reemplazar a $y_{i}$ y a $x_{i}$ por los nombres de las variables que estamos empleando.
+
+$$ln[Pr(dropout_{i} = 1)] = \hat{\beta}_{0} + \hat{\beta}_{1}poor_{i}$$
+
+La siguiente figura reproduce los resultados de la tabla 4 de Osborne (2012).
+
+![Table 4: SPSS logistic regression output for POOR and DROPOUT analysis](Osborne_2012_table_4.jpg){width=400px fig-align="center"}
+
+## Modelo ajustado en R
+
+A continuación ajustamos el modelo de regresión logística que reproduce los resultados de la tabla 4 de Osborne (2012, p6):
+
+**Código 8**. Modelo regresión logística con un predictor sobre `dropout`.
+
+```{r, echo = TRUE, eval = TRUE}
+
+# modelo de regresión logística con un predictor binario
+glm(dropout ~ 1 + poor, data = data_nels, family = "binomial") %>%  # <1>
+summary()                                                           # <2>
+
+```
+
+En la siguiente sección vamos a revisar la salida que nos entrega el código anterior.
+
+## Output anotado: **modelo con un predictor**
+
+A continuación vamos a revisar las líneas adicionales de la salida de una regresión logística que entrega R, empleando a la función `glm()`.
+
+**Output 2.** Salida del modelo con un predictor
+
+```{r}
+#| echo: TRUE
+#| eval: FALSE
+#| comment: '#'
+
+# Call:
+# glm(formula = dropout ~ 1 + poor, family = "binomial", data = data_nels)
+# 
+# Deviance Residuals: 
+#     Min       1Q   Median       3Q      Max  
+# -0.5606  -0.5606  -0.2423  -0.2423   2.6619  
+# 
+# Coefficients:
+#             Estimate Std. Error z value Pr(>|z|)    
+# (Intercept) -3.51353    0.06648  -52.85   <2e-16 ***            # <1>
+# poor         1.74234    0.07321   23.80   <2e-16 ***            # <2>
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# (Dispersion parameter for binomial family taken to be 1)
+# 
+#     Null deviance: 9967.2  on 16609  degrees of freedom         # <3>
+# Residual deviance: 9205.5  on 16608  degrees of freedom         # <4>
+# AIC: 9209.5
+# 
+# Number of Fisher Scoring iterations: 6
+```
+
+
+1. Al igual que en el output anterior esta es la línea del intercepto del modelo, $\hat{\hat{\beta}}_{0}$. Sin embargo, ahora esta calculara para entregarnos los logits de $Pr(y = 1 | x = 0)$. Es decir, que estos valores nos permiten obtener la tasa de prevalencia del evento de interes, entre los estudiantes que vienen de familias de ingresos iguales o supieriors al promedio de ingreso.
+
+2. En esta línea se encuentra el estimado de $\hat{\beta}_{1}$. Este nos entrega a las probabilidades condicionales del evento de interes, cuando `poor == 1` en log(odds) o logits. Dicho en otras palabras. Este estimado nos permite saber cuanto más grande son las chances de que los estudiantes pobres deserten de la secundaria, en contraste a los estudiantes que han desertado, pero que provienen de familias de mayores ingresos. Si exponenciamos este coeficiente podemos convertir este coeficiente a **odds ratio** $\exp(\hat{\hat{\beta}}_{1}) = 5.711$
+
+3. Al igual que en el modelo nulo, esta línea nos reporta el total de la devianza del modelo nulo. Este número es la suma de todas las devianzas asociadas a cada valor observado, donde se solo se emplea al intercepto del modelo como información.
+
+4. Esta línea nos entrega la suma de las devianza de todas las observaciones luego de que emplearamos la infmoración del modelo ajustado, incluyendo al intercepto y a la pendiente asociada a la variable `poor`.
+
+## Agregando los odds ratio
+
+Empleando a `broom::tidy()`, podemos exponenciar a los estimados obtenidos, producir a los odds ratio del modelo, y agregarlos a la tabla de resultados. El siguiente código incluye líneas para para implementar estos diferentes pasos.
+
+**Código 9.** Agregar odds ratio a la tabla de estimados
+
+```{r, echo = TRUE, eval = TRUE}
+
+# modelo de regresión logística con un predictor binario
+glm(dropout ~ 1 + poor, data = data_nels, family = "binomial") %>%  # <1>
+broom::tidy()  %>%                                                  # <2>
+mutate(odds_ratio = exp(estimate))  %>%                             # <3>
+knitr::kable(., digits = 3)                                         # <4>
+
+```
+
+1. La primera línea específica el modelo que queremos ajustar.
+
+2. En una secuencia aplicamos la función `broom::tidy()` para que de salida tradicional de `glm()` extraigamos a los estimados como una tabla.
+
+3. La función `mutate()` genera la variable `odds_ratio` donde alojaremos a los estimados exponenciados.
+
+4. Finalmente, empleamos a la función `knitr::kable()` para desplegar a la tabla creada, como una tabla estructurada en la consola.
+
+# Formulas de odds ratio
+
+## Logits y odds ratio: un poco de algebra
+
+Los odds ratio, a diferencia de los odds son razones entre dos odds. Si exponienciamos al coefiente $\hat{\beta}_{1}$ del modelo anterior vamos a obtener un odds ratio.
+
+$$\text{odds ratio} = exp(\hat{\beta}_{1})$$
+
+Este odds ratio proviene de la siguiente relación de odds (Rabe-Hesketh et al., 2012, p 503):
+
+$$\frac{Odds(y_{i} = 1 | x_{1} = a + 1)}{Odds(y_{i} = 1 | x_{1} = a)}$$
+
+Lo anterior quiere decir que el aumento de odds de $y_{i} = 1$, condicional a una unidad adicional sobre $x_{1} = a + 1$, por sobre los odds de $Odds(y_{i} = 1$ condicional a los valores de $x_{i}$ antes de aumentar en una unidad (i.e., $x_{1} = a)$) es equivalente a $exp(\hat{\beta}_{1})$
+
+La función de enlace de la regresión logística (i.e., *function link*), es atractiva porque produce una función lineal a los log odds (i.e., una recta). Si restaramos las siguientes expresiones entre sí, de tal forma que restaramos a la expresion 2, a la expresión 1 siguiente, obtendriamos como resultado a $\beta_{1}$.
+
+- Expresión 1: 
+
+$$ln[Odds(y_{i} = 1 | x_{1} = a + 1)] = \beta_{0} + \beta_{1}(a + 1)$$
+
+- Expresión 2: 
+
+$$ln[Odds(y_{i} = 1 | x_{1} = a)]  = \beta_{0} + \beta_{1}(a)$$
+
+El resultado de la resta entre las expresiones anteriores es $\beta_{1}$. Veamos esto por pasos:
+
+- Paso 1: $[\beta_{0} + \beta_{1}(a + 1)] - [\beta_{0} + \beta_{1}(a)]$
+
+> Eliminamos a los interceptos.
+
+- Paso 2: $\beta_{1}(a + 1) - \beta_{1}(a)$
+
+> Multiplicamos los términos sobre los parentesis.
+
+- Paso 3: $\beta_{1}a + \beta_{1} - \beta_{1}a$
+
+> Aplicamos la resta entre los términos equivalentes.
+
+- Resultado: $\beta_{1}$
+
+
+
+Si extendemos el modelo a la inclusión de dos predictores, podemos escribir la regresión logística como:
+
+$$ln[Pr(y_{i} = 1 | x_{1i}, x_{2i})] = \beta_{0} + \beta_{1}x_{1i} + \beta_{2}x_{2i}$$
+
+En este caso, $exp(\hat{\beta}_{1})$ es interpretado comos los odds ratio de la probabilidad esperada de $y_{i} = 1$, cuando $x_{1i} = a + 1$, en contraste a $x_{1i} = a$, a valores cero de $x_{2i}$ (i.e., controlando por $x_{2i}$).
+
+Por su parte, $exp(\hat{\beta}_{2})$ son los odds ratio de $Pr(y_{i} = 1)$, cuando $x_{2i} = a + 1$,  en contraste a $x_{2i} = a$, cuando $x_{1i} = 0$ (i.e., controlando por $x_{1i}$).
+
+Podemos ser más explicitos aun, y descomponer la información implicada por $exp(\hat{\beta}_{1})$, y tenemos que:
+
+$$\frac{Odds(y_{i} = 1 | x_{1} = a + 1)}{Odds(y_{i} = 1 | x_{1} = a)} =  \frac{Pr(y_{i} = 1 | x_{1} = a + 1)}{Pr(y_{i} = 0 | x_{1} = a + 1)} \biggm/ \frac{Pr(y_{i} = 1 | x_{1} = a)}{Pr(y_{i} = 0 | x_{1} = a)}$$
+
+De esta forma, podemos indicar analíticamente, i.e. mediante formulas y algebra, que los odds ratio generados por un modelo de regresión logística son la razon de proporción de $y_{i}$, es decir $Pr /(1-Pr)$, condicional a los valores de $x_{i}$, a una unidad de distancia (i.e., $x_{i} = a + 1$ vs. $x_{i} = a$).
+
+# Tabla 5: Modelo con varios predictores
+
+## Modelo Ajustado
+
+En la tabla 5 Osborne (2012) incluye dos predictores continuos, además de una interación entre los predictores incluidos en el modelo. En términos generales podemos representar este modelo de la siguiente forma:
+
+$$ln[Pr(y_{i} = 1)] = \hat{\beta}_{0} + \hat{\beta}_{1}x_{1i} + \hat{\beta}_{2}x_{2i} + \hat{\beta}_{3}x_{2i}x_{3i}$$
+
+Vamos a proceder de la misma forma anterior, y vamos a reemplazar los términos genéricos de la ecucación anterior por las variables que estamos empleando para la ilustración presente.
+
+$$ln[Pr(dropout_{i} = 1)] = \hat{\beta}_{0} + \hat{\beta}_{1}ZACH_{i} + \hat{\beta}_{2}zses_{i} + \hat{\beta}_{3}ZACH_{i}zses_{i}$$
+
+La tabla 5 de Osborne (2012, p7) se ve de la siguiente forma:
+
+![Table 5: SPSS logistic regression output predicting DROPOUT fro ACH, SES](Osborne_2012_table_5.jpg){width=400px fig-align="center"}
+
+## Modelo ajustado en R
+
+Para ajustar un modelo de regresión logística con más de un predictor, nos basta con *llamar* a las variables de interés en la linea de formula del comando `glm`. Además, para incluir interacciones entre los predictores, podemos interponer `:` con lo cual R interpreta que necesitamos al producto de las variables incluidas en la formula.
+
+**Código 10.** Ajuste de modelo de regresión con varios predictores.
+
+```{r, echo = TRUE, eval = TRUE}
+
+# modelo de regresión logística con varios predictores
+glm(dropout ~ ZACH + zses + ZACH:zses, 
+  data = data_nels, 
+  family = "binomial") %>%                                          
+broom::tidy()  %>%                                                  
+mutate(odds_ratio = exp(estimate))  %>%                             
+knitr::kable(., digits = 3)                                         
+
+```
+
+El código anterior se diferencia del **Código 8** empleado para la tabla 4, no sólo porque estamos empleando más de un predictor, sino porque estamos incluyendo una interacción entre variables. Hay tres maneras de incluir un término de interacción entre variables en los modelos líneales generales en R. Podemos incluir términos de interacción empleando las siguiente formas
+
+- a. `variable_1:variable_2`;
+- b. `variable_1*variable_2`;
+- c. también es posible incluir los términos de interacción creando una nueva variable, emplando un comando como el siguiente `mutate(int = variable_1*variable_2`
+
+::: {.callout-tip title="Tip"}
+Con las tres formas de código se producen los mismos resultados (ver Anexo 1: interacción).
+:::
+
+A continuación vamos a ajustar el modelo de rgeresión logística con varios predictores, e inspeccionaremos la salida tradicional que nos entrega, empleando a la función `summary()`.
+
+**Código 11.** Ajuste de modelo de regresión con varios predictores y salida tradicional.
+
+```{r, echo = TRUE, eval = TRUE}
+
+# modelo de regresión logística con varios predictores
+glm(dropout ~ ZACH + zses + ZACH:zses, 
+  data = data_nels, 
+  family = "binomial") %>%                                          
+summary()
+
+```
+
+## Output anotado: **modelo con varios predictores**
+
+Vamos a revisar la salida del output anterior. A diferencia de la salida del modelo ajustado con un solo predictor, ahora se incluyen dos líneas adicionales, una para el predictor adicional, y otra línea de salida para incluir al estimado del término de interacción.
+
+
+**Output 3.** Salida del modelo ajustado con varios predictores
+
+```{r}
+#| echo: TRUE
+#| eval: FALSE
+#| comment: '#'
+
+# Call:
+# glm(formula = dropout ~ ZACH + zses + ZACH:zses, family = "binomial", 
+#     data = data_nels)
+# 
+# Deviance Residuals: 
+#     Min       1Q   Median       3Q      Max  
+# -1.3764  -0.4708  -0.2510  -0.1017   3.6332  
+# 
+# Coefficients:
+#             Estimate Std. Error z value Pr(>|z|)    
+# (Intercept) -3.17426    0.05397 -58.817  < 2e-16 ***            # <1>
+# ZACH        -1.17443    0.05479 -21.436  < 2e-16 ***            # <2>
+# zses        -0.85697    0.05402 -15.863  < 2e-16 ***            # <3>
+# ZACH:zses   -0.20932    0.05138  -4.074 4.61e-05 ***            # <4>
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# (Dispersion parameter for binomial family taken to be 1)
+# 
+#     Null deviance: 9967.2  on 16609  degrees of freedom        # <5>
+# Residual deviance: 8045.5  on 16606  degrees of freedom        # <6>
+# AIC: 8053.5
+# 
+# Number of Fisher Scoring iterations: 7                         # <7>
+```
+
+1. Esta línea nos entrega el estimado del intercepto del modelo, es el estimado de $\hat{\beta}_{0}$. Este estimado nos permite llegar a la prevalencia del evento, a niveles medios de la variable `ZACH`, a niveles medios de la variable `zses`, y sin interacción. Este estimado, sigue la misma lógica de los modelos de regresión lineal donde el itercepto es el valor esperado de la variable de respuesta, es decir $E(y_{i})$, cuando todos los valores de las covariables del modelo se encuentran en cero.
+
+2. En esta línea se encuentra el estimado de $\hat{\beta}_{1}$. Este estimado nos indica que los riesgos de deserción escolar disminuyen condicionales al desempeño académicos de los estudiantes. Se esper que ños estudiantes a una desviación estándar de desempeño académico presentan probabilidades condicionales de deserción escolar menor, a la de sus pares con desempeños académicos medios.
+
+3. En esta línea se encuentra el estimado de $\hat{\beta}_{2}$. Este estimado nos indica que los riesgos de deserción escolar disiminuyen, condicionales al nivel socioeconómico de las familias. `ses` es una variable continua, generada como el compuesto de la educación de madre y padre, la ocupación de ambos padres, y el ingreso del hogar (ver NCES, 2018, p5). Estudiantes a una desviación estandar de la media de los estudiantes, en este indicador, son menos proclives a desertar de la educación secundaria.
+
+4. En esta línea se encuentra el estimado de $\hat{\beta}_{3}$. Este estimado nos indica que los riesgos de deserción escolar se aceleran o desaceleran producto de los valores de `ACH` o de `ses`. En este caso, dado que el estimado es negativo, de igual dirección que los coeficiientes anteriores, lo podemos interpretar como un término de interacción que representa a una aceleración. Es decir, es un coeficiente que modera de forma positiva a los coeficientes anteriores. Los resultados de este coeficiente implican que los estudiantes de familias de mayor nivel socioeconómico, y de mayor desempeño académico, son menos proclives a desertar de la secundaria
+
+5. Al igual que en los modelos anteriores, esta línea nos entrega la devianza del modelo nulo. Este resultado nos permite evaluar de forma global al modelo ajustado, en contraste al modelo, por ejemplo empleando una prueba omnibus como un *Likelihood Ratio Test* (ver Masyn, 2013; Rabe-Hesketh et al, 2012).
+
+6. Esta línea nos entrega la devianza total del modelo ajustado. Esta corresponde a la suma total de devianzas de todos los valores observados en contraste a los valores esperados por el modelo, expresados en escala de devianzas. Este número, puede ser considerado una medida de ajuste de los datos al modelo ajustado. Es un término análogo al calculo de residuales presentes en los modelos de regresión linea, solo que se encuentra en escala de devianza.
+
+7. A diferencia de los modelos de regresión lineal, en la cual los estimados pueden ser obtenidos mediante soluciones analíticas (i.e., con un poco de algebra), los resultados de los modelos de regresión logística no pueden ser resueltos de esta forma, y requieren de métodos numéricos. Los métodos numéricos son procesos de estimación iterativos. En estos procesos se comienza con un aproximado de los posibles valores que pudieran resolver a los estimados, y que al mismo tiempo minimizen las devianzas de los valores observados en comparación modelo posible de cada iteración. Esta línea, nos indica que se realizaron 7 iteraciones antes de encontrar los estimados propuestos en el modelo.
+
+::: {.callout-tip title="Tip"}
+Bryer (2021) tiene una visualización de un proceso de interación para regresión logística de un solo predictor. Ver: https://htmlpreview.github.io/?https://github.com/jbryer/visualMLE/blob/master/doc/mle.html
+:::
+
+# Tabla 6: Tabla de resultados esperados
+
+Osborne (2012) emplea los resultados del modelo presentado en la tabla 5 para producir un conjunto de valores esperados. Estos valores esperados sirven para ilustrar los resultados encontrados para el término de interacción `ZACH:zses` incluído en el modelo anterior. 
+
+Existen varias maneras de producur la tabla de valores esperados presentados en la tabla 6. Primero lo haremos de manera manual, y luego lo haremos empleando el objeto que nos entrega la funcion `glm()`.
+
+## Logits esperados
+
+Recordemos el modelo ajustado:
+
+$$ln[Pr(dropout_{i} = 1)] = \hat{\beta}_{0} + \hat{\beta}_{1}ZACH_{i} + \hat{\beta}_{2}zses_{i} + \hat{\beta}_{3}ZACH_{i}zses_{i}$$
+
+Con este modelo, podemos generar los modelos logits esperados a diferentes valores observados de las variables `ZACH` y `zses`. El autor emplea los valores -2SD y +2SD como ejemplos valores que representen a valores altos y bajos de cada factor del modelo.
+
+Los valores esperados por el modelo, en escala logit los podemos expresar de la siguiente forma:
+
+$$\hat{ln[Pr(dropout_{i} = 1)]} = \hat{\beta}_{0} + \hat{\beta}_{1}ZACH_{i} + \hat{\beta}_{2}zses_{i} + \hat{\beta}_{3}ZACH_{i}zses_{i}$$
+
+Si reemplazamos los valores de $\hat{\beta}_{0}$, $\hat{\beta}_{1}$, $\hat{\beta}_{2}$ y $\hat{\beta}_{3}$ por lo valores obtenidos en el modelo anterior, con hasta tres decimales, podemos escribir la ecuación de los logits esperados por el modelo:
+
+$$\hat{ln[Pr(dropout_{i} = 1)]} = -3.174 -1.174(ZACH_{i}) -0.857(zses_{i}) -0.209(ZACH_{i}zses_{i})$$
+
+A continuación reemplazamos los valores de cada variable, por los valores de interés, y empleamos las formulas de logits esperados, las de odds ratio, y las formulas para obtener las probabilidades condicionales.
+
+**Código 12.** Calcular valores esperados por el modelo
+
+```{r, echo = TRUE, eval = TRUE}
+
+# valores de interés
+lo_ach <- -2
+hi_ach <-  2
+lo_ses <- -2
+hi_ses <-  2
+
+# coeficientes en logits del modelo
+b0 <- -3.174
+b1 <- -1.174
+b2 <- -0.857
+b3 <- -0.209
+
+# logits esperados a cada conjunto de valores de interés
+e_logit_1 <- b0 + b1*(lo_ach) + b2*(lo_ses) + b3*(lo_ach*lo_ses)
+e_logit_2 <- b0 + b1*(lo_ach) + b2*(hi_ses) + b3*(lo_ach*hi_ses)
+e_logit_3 <- b0 + b1*(hi_ach) + b2*(lo_ses) + b3*(hi_ach*lo_ses)
+e_logit_4 <- b0 + b1*(hi_ach) + b2*(hi_ses) + b3*(hi_ach*hi_ses)
+
+# crear tabla 6
+table_6 <- data.frame(
+group = c(
+  'Low ACH, Low SES',
+  'Low ACH, High SES',
+  'High ACH, Low SES',
+  'High ACH, High SES'),
+predicted_logits = c(
+e_logit_1,
+e_logit_2,
+e_logit_3,
+e_logit_4
+)
+) %>%
+mutate(odds_ratio = exp(predicted_logits)) %>%
+mutate(conditional_prob = odds_ratio/(1+odds_ratio))
+
+# mostrar tabla 6
+knitr::kable(table_6, digits = 3)
+
+
+```
+
+## Valores predichos
+
+Los valores predichos por el modelo, y los valores esperados por el modelo refieren a la misma entidad. Es decir, que los valores predichos consisten en los valores que podemos producir empleando a los estiados del modelo.
+
+A continuación replicamos el procedimiento anterior, pero por medio de la función `predict()`. Esta función en R, nos permite generar valores esperados empleando al modelo ajustado como objeto, y bridandole los valores de interés que quisieramos.
+
+Para emplear esta función, vamos a crear un objeto que contenga al modelo de interés. Vamos a llamar a este objeto `m02`. Luego, vamos a crear una tabla de datos, que contenga los valores de interés. Finalmente, empleamos a la función `predict()` para producir los valores esperados por el modelo, en la escala de logits, y en la escala de probabilidades.
+
+**Código 13.** Calcular valores predichos empleando a `predict()`
+
+```{r, echo = TRUE, eval = FALSE}
+
+
+# ajustar modelo
+m02 <- data_nels %>%                    # <1>
+       mutate(int = ZACH*zses) %>%      # <1>
+       glm(dropout ~ ZACH + zses + int, # <2>
+       data = .,                        # <2>
+       family = "binomial"              # <2>
+       )                                # <2>
+
+# tabla de valores esperados
+expected_values <- data.frame(          # <3>
+ZACH =  c(-2,-2,2,2),                   # <3>
+zses  = c(-2,2,-2,2)                    # <3>
+) %>%                                   # <3>
+mutate(int = ZACH*zses)                 # <4>
+
+# crear tabla
+tabla_6a <- data.frame(                 # <5>
+group = c(                              # <5>
+  'Low ACH, Low SES',                   # <5>
+  'Low ACH, High SES',                  # <5>
+  'High ACH, Low SES',                  # <5>
+  'High ACH, High SES'                  # <5>
+),
+predicted_logits =
+ predict(m02, newdata = expected_values, type = 'link') # <6>
+) %>%
+mutate(odds_ratio = exp(predicted_logits)) %>%          # <7>
+mutate(conditional_prob = 
+  predict(m02, newdata = expected_values, type = 'response' # <8>
+    )
+)
+
+# mostrar tabla
+knitr::kable(tabla_6a, digits = 3) # <9>
+
+```
+
+1. Con estas líneas de código creamos la base de datos que ahora contiene al término de interacción `int`, el cual corresponde a la multiplicación de los términos `ZACH`y `zses`.
+
+2. En secuencia, ahora escribimos la formula que expresa al modelo que queremos ajustar. El resultado de nuestro modelo ajustado, queda alojado en el objeto `m02`.
+
+3. En estas lineas de codigo, nos encontramos creando una tabla de datos que posee 3 columnas: `ZACH`, `zses`, y la columna `int`. Cada una de estas columnas contiene a los valores de interés -2,-2,2,2; -2,2,-2,2, y a los valores 4, -4, -4, 4 respectivamente.
+
+4. En particular la línea que contiene a `mutate(int = ZACH*zses)` crea al vector, o columna de valores para nuestro término de interacción `int`. Este vector contiene a los valores 4, -4, -4, 4.
+
+5. Ahora creamos la tabla 6, indicando primero la secuencia de grupos 'Low ACH, Low SES', 'Low ACH, High SES','High ACH, Low SES','High ACH, High SES' presentes en la tabla 6.
+
+6. Con la función `predict()` creamos los valores predichos empleando al objeto `m02`. En esta aplicación ocupamos al argumento `type = 'link'` para que los valores predichos se encuentren en la escala de logits.
+
+7. Con los valores predichos, podemos calcular a los odds ratio, por medio de exponenciar a los logits obtenidos.
+
+8. Nuevamente, empleando a la función `predict()`, pero esta vez con el argumento `type = 'response'` podemos obtener los valores predichos en escala de probabilidades. Estas son las probabilidades condicionales generadas con el modelo sobre los valores de interés.
+
+9. Finalmente, con la última linea podemos desplegar en consola tabla creada.
+
+Empleando el **Código 13** podemos generar la siguiente tabla.
+
+
+```{r, echo = FALSE, eval = TRUE}
+
+
+# ajustar modelo
+m02 <- data_nels %>%                    # <1>
+       mutate(int = ZACH*zses) %>%      # <1>
+       glm(dropout ~ ZACH + zses + int, # <2>
+       data = .,                        # <2>
+       family = "binomial"              # <2>
+       )                                # <2>
+
+# tabla de valores esperados
+expected_values <- data.frame(          # <3>
+ZACH =  c(-2,-2,2,2),                   # <3>
+zses  = c(-2,2,-2,2)                    # <3>
+) %>%                                   # <3>
+mutate(int = ZACH*zses)                 # <4>
+
+# crear tabla
+tabla_6a <- data.frame(                 # <5>
+group = c(                              # <5>
+  'Low ACH, Low SES',                   # <5>
+  'Low ACH, High SES',                  # <5>
+  'High ACH, Low SES',                  # <5>
+  'High ACH, High SES'                  # <5>
+),
+predicted_logits =
+ predict(m02, newdata = expected_values, type = 'link') # <6>
+) %>%
+mutate(odds_ratio = exp(predicted_logits)) %>%          # <7>
+mutate(conditional_prob = 
+  predict(m02, newdata = expected_values, type = 'response' # <8>
+    )
+)
+
+# mostrar tabla
+knitr::kable(tabla_6a, digits = 3)
+
+```
+
+::: {.callout-important title="Importante"}
+Los resultados de Osborne (2012) de la tabla 6 no son reproducibles para la primera fila de la tabla. En el articulo el autor reporta un logit esperado de 0.088; mientras que nosotros obtenemos un logit esperado de 0.051. Asumimos que la discrepancia es un error presente en el artículo original.
+:::
+
+# Figura 2: Interación en logits
+
+Osborne (2012) genera una gráfica empleando a los valores predichos de la Tabla 6, presente en la figura 2. En la siguiente sección, vamos a crear esta figura de manera manual. Existen varias maneras de extraer a los valores predichos. La forma siguiente, es una manera sencilla de producir la tabla de estimados necesarios para producir a la figura 2.
+
+![Figura 2: Interaction of achievement and family SES in logits](Osborne_2012_figure_2.jpg){width=400px fig-align="center"}
+
+## Plot con logits esperados
+
+
+**Código 14.** Tabla de valores predichos para Figura 2.
+
+```{r, echo = TRUE, eval = TRUE}
+
+
+# creamos tabla básica con los logits esperados
+data_plot <- data.frame(                                      # <1>
+x_var = c('Low SES', 'High SES', 'Low SES','High SES'),       # <1>
+y_var = c(e_logit_1, e_logit_2, e_logit_3, e_logit_4),        # <1>
+group = c('Low ACH', 'Low ACH', 'High ACH','High ACH')        # <1>
+)                                                             # <1>
+
+# reordenamos a los valores del factor ses
+data_plot_figure_2 <- data_plot %>%                           # <2>
+mutate(ses_grp = as.factor(x_var)) %>%                        # <2>
+mutate(ses_grp =                                              # <2>
+  forcats::fct_relevel(ses_grp,c('Low SES', 'High SES'))      # <2>
+  ) %>%                                                       # <2>
+mutate(ach_grp = as.factor(group)) %>%                        # <3>
+mutate(ach_grp =                                              # <3>
+  forcats::fct_relevel(ach_grp,c('Low ACH', 'High ACH'))      # <3>
+  )        
+# mostrar la tabla generada
+knitr::kable(data_plot_figure_2, digits = 3)                  # <4>
+
+```
+
+1. Con estas líneas nos encontramos generando la tabla de estimados, empleando el mismo método que hemos empleado en el **Código 13**, empleando directamente a la función `data.frame`.
+
+2. Sobre la misma tabla creada anteriormente, necesitamos crear una variable de tipo factor, de modo que podamos darle un orden discrecional a la manera en que se ordena el eje X de la figura 2. De lo contrario `ggplot2` va colocar como primer valor al grupo que posea el nombre que aparece primero por orden alfabético. En este caso al grupo `High SES`.
+
+3. Procedemos de la misma forma con la variable `group`. Esto nos permite darle el orden que deseemos a la legenda presente en la figura 2. En particular, queremos que `Low ACH`, aparezca primero, y luego aparezca `High ACH` en la legenda de los puntos y las líneas de figura 2.
+
+4. Finalmente, con la última línea desplegamos la tabla creada con la función `knitr::kable()`, para inspeccionar si luce como esperamos.
+
+
+Para crear la figura 2 de la manera más similar posible a como aparece en el artículo, vamos a emplear la librería `ggplot2` (Wicham, 2008; 2009). Esta es una librería que permite controlar diferentes aspectos de los gráficos o plots que uno desee construir. Por lo mismo, debido a que permite especificar una serie de parámetros para dibujar figuras basadas en datos, requiere que el usuario indique diferentes opciones. De esta manera, el costo de crear figuras de forma específica es que se empleen varias líneas de código. A continuación escribimos varias de estas líneas, y comentamos que se encuentra haciendo cada una.
+
+
+**Código 15.** Crear figura 2 con `ggplot2`
+
+```{r, echo = TRUE, eval = TRUE, fig.align = 'center'}
+
+# creamos la figura 2
+library(ggplot2)
+figure_2 <- ggplot(data_plot_figure_2, # <1>
+  aes(                                 # <2>
+    x = ses_grp,                       # <3>
+    y = y_var,                         # <4>
+    group = ach_grp,                   # <5>
+    color = ach_grp,                   # <6>
+    shape = ach_grp                    # <7>
+    )) +                               # <8>
+geom_line() +                          # <9>
+geom_point(size=4) +                   # <10>
+scale_color_manual(                    # <11>
+  values = c(                          # <11>
+    'High ACH' = 'red',                # <11>
+    'Low ACH' = 'black'                # <11>
+    )) +                               # <11>
+scale_shape_manual(                    # <12>
+  values = c(                          # <12>
+    'High ACH' = 19,                   # <12>
+    'Low ACH' = 15                     # <12>
+    )) +                               # <12>
+xlab('') +                             # <13>
+scale_y_continuous(                                    # <14>
+  name = 'Logit (natural log of the odds of dropout)', # <15>
+  breaks = seq(-9,1,1)                                 # <16>
+  ) +                                                  # <17>
+theme_bw() +                            # <18>
+theme(                                  # <19>
+  legend.title = element_blank(),       # <20>
+  panel.grid.major.x = element_blank(), # <21>
+  panel.grid.minor.y = element_blank(), # <22>
+  panel.grid.major.y =                              # <23>
+  element_line(linewidth = .25, colour = "grey70")  # <23>
+  )                                                 # <23>
+
+# mostrar la figura 2
+figure_2  # <24>
+
+```
+
+1. Llamamos los datos creados anteriormente al objeto `data_plot_figure_2`, dentro de la función general `ggplot()`.
+
+2. Abrimos la función `aes()` para indicar que vectores de la tabla van a definir ciertos parámetros.
+
+3. En esta línea, indicamos que el eje x va a representar a los valores contenidos en `ses_grp`
+
+4. En esta línea, indicamos que el eje y va a representar a los valores contenidos en `y_var`. Esta variable o vector de valores, contiene a los logits esperados por el modelo.
+
+5. El argumento `group` toma los valores de la variale `ach_grp` de la tabla. Este nos sirve para que los puntos graficos puedan ser unidos por las líneas generadas por `geom_line()`. Si este línea fuera suprimida, solo graficaríamos puntos.
+
+6. El argumento `color` toma los valores de la variale `ach_grp` de la tabla. Esto nos sirve para posteriormente definir que colores debe tener las líneas y puntos generados. Estos los definimos posteriormente en la nota 11.
+
+7. El argumento `shape` toma los valores de la variale `ach_grp` de la tabla. Esto nos sirve para que especifiquemos que forma toma cada punto. Estos los definimos posteriormente en la nota 12.
+
+8. Esta línea se incluye para cerrar al argumento `aes()`. Además, esta linea incluye al símbolo `+` para encadenar a las diferentes funciones. En algun sentido, esta lógica es un precursor a los `%>%` presentes de modo general en la librería `dplyr`.
+
+9. `geom_line()` Es el argumento que le indica a `ggplot()` que vamos a dibujar líneas.
+
+10. `geom_point()` Es el argumento que le indica a `ggplot()` que ademas vamos a dibujar puntos.
+
+11. `scale_color_manual()` nos permite indicar los colores que vamos a emplear para las lineas y puntos incluidos en la figura. En estas líneas indicamos que grupos toman que colores. Definimos que el grupo `Low ACH` tome el color negro, y que el grupo `High ACH` tome el color rojo.
+
+12. `scale_shape_manual()` nos permite indicar que formas toda cada punto dibujado. La forma 19 corresponde a un círculo coloreado, y la forma 15 corresponde a un cuadrado coloreado.
+
+13. Esta línea, nos permite suprimir al texto del eje x de la figura, por un espacio vacío.
+
+14. `scale_y_continuous` nos permte definir el texto del eje y de la figura, además de como aparecen los números de este eje.
+
+15. Con el subargumento `name = ` indicamos que texto queremos que aparezca en el eje y.
+
+16. Con el subargumento `breaks = ` indicamos como queremos que aparezcan los números del eje y. Empleamos a la función `seq(-9,1,1)` para que se produzca un vector de 11 valores, desde -9 a 1. Esta es una función que nos permite generar todos los valores posibles entre los extremos -9 y 1, avanzando en una unida.
+
+17. Esta línea cierra a la función `scale_y_continuous`, y continuar con los siguentes argumentos para producir a la figura de interés.
+
+18. La función `theme_bw` nos permite aplicar de forma general un tema o template genérico sencillo, el cual porsee defaults de blanco y negro. Existen diferentes opciones de este tipo, para aplicar diversos templates (ver: https://ggplot2.tidyverse.org/reference/ggtheme.html)
+
+19. La función `theme()` nos permite cambiar aspectos específicos de la estética de la figura. Existen diversos aspectos que podemos alterar (ver: https://ggplot2.tidyverse.org/reference/theme.html). A continuación, vamos a cambiar algunos aspectos como la leyenda, y las lineas que aparecen en el panel de fondo de la figura.
+
+20. Incluimos `legend.title = element_blank()` para borrar al titulo de la leyenda de la figura.
+
+21. Incluimos `panel.grid.major.x = element_blank(),` para eliminar las lineas verticales que aparecen en el panel de fondo de la figura.
+
+
+22. Incluimos `panel.grid.minor.y = element_blank(),` para eliminar algunas lineas horizontales que aparecen por defecto en este tipo de plot. Lo que queremos lograr, es que nuestro plot se asemeje los más posible a la figura que aparece en el artículo.
+
+23. En el argumento `panel.grid.major.y` definimos el groso de las lineas horizontales junto a su color.
+
+24. Finalmente, llamamos en consola a la figura que queremos mostrar.
+
+# Figura 3: Probabilidades observadas
+
+Osborne (2012) genera una figura de probabilidades observadas. Esta figura sirve para ilustrar la relación que posee el nivel socioeconómico de las familias de los estudiantes, con respecto a la deserción escolar observada, condicional al nivel desempeño académico de los estudiantes.
+
+Para poder generar esta figura el autor realiza diversos pasos. En la siguiente sección revisamos cada uno de los pasos que pudo haber empleado el autor, y tratamos de reproducir a la siguiente figura.
+
+![Figura 3: Observed probability of dropout](Osborne_2012_figure_3.jpg){width=400px fig-align="center"}
+
+## Tabla de proporciones observadas
+
+Para poder generar la figura 3 el autor realiza diversos pasos. Uno de ellos, es que necesita separar a los valores de la `ZACH` entre aquellos que se encuentran por sobre la media de desempeño, y los que se encuentran bajo la media de desempeño. Esencialmente, esta crear una variable dicotómica a partir de una variable continua. Vamos a crear esta variable discretizada con el siguiente código:
+
+`dplyr::if_else(ZACH > mean(ZACH),'High ACH','Low ACH'))`
+
+Además, necesita agrupar a la variable `zses` en diferentes grupos, seguna secuencia compleja de rangos. Vamos crear una serie de valores discretos ordenados, segun la secuencia de rangos que genera el autor. Osborne (2012) esta agrupando todos los valores menores -3 de la variable `zsez`, y luego agrupa a todos los valores siguientes, en rangos de incrementos de .05. Finalmente, genera un último rango que agrupa a todos los valores sobre 2. Esta agrupación de valore de `zses` la vamos a generar con el siguiente código:
+
+`cut(zses, breaks = c(-9, seq(-3, 2, .5), 9)))`
+
+A continuación generamos el código que genera la tabla que podemos ocupar en `ggplot2` para producir a la figura de interés.
+
+**Código 16.** Tabla de proporciones esperadas.
+
+```{r, echo = TRUE, eval = TRUE}
+
+# creamos tabla para figura 3
+data_plot_figure_3 <- data_nels %>%                      # <1>
+mutate(ach_grp =                                         # <1>
+  dplyr::if_else(ZACH > mean(ZACH),'High ACH','Low ACH') # <1>
+  ) %>%                                                  # <1>
+mutate(ach_grp = as.factor(ach_grp)) %>%                 # <2>
+mutate(ach_grp =                                         # <3>
+  forcats::fct_relevel(ach_grp,c('Low ACH', 'High ACH')) # <3>
+  ) %>%                                                  # <3>
+mutate(ses_grp =                                         # <4>
+  cut(zses, breaks = c(-9, seq(-3, 2, .5), 9))           # <4>
+  ) %>%                                                  # <4>
+group_by(ses_grp, ach_grp) %>%                           # <5>
+summarize(                                               # <6>
+n = n(),                                                 # <7>
+droput_prob = mean(dropout, na.rm = TRUE),               # <8>
+median_ses = median(zses, na.rm = TRUE)                  # <9>
+) %>%                                                    # <10>
+arrange(ses_grp) %>%                                     # <11>
+mutate(ses_txt = case_when(                              # <12>
+ses_grp == '(-9,-3]'   ~ '< -3',                         # <12>
+ses_grp == '(-3,-2.5]' ~ '-2.5',                         # <12>
+ses_grp == '(-2.5,-2]' ~ '-2.0',                         # <12>
+ses_grp == '(-2,-1.5]' ~ '-1.5',                         # <12>
+ses_grp == '(-1.5,-1]' ~ '-1.0',                         # <12>
+ses_grp == '(-1,-0.5]' ~ '-0.5',                         # <12>
+ses_grp == '(-0.5,0]'  ~ ' 0.0',                         # <12>
+ses_grp == '(0,0.5]'   ~ ' 0.5',                         # <12>
+ses_grp == '(0.5,1]'   ~ ' 1.0',                         # <12>
+ses_grp == '(1,1.5]'   ~ ' 1.5',                         # <12>
+ses_grp == '(1.5,2]'   ~ ' 2.0',                         # <12>
+ses_grp == '(2,9]'     ~ '>2+'                           # <12>
+)) %>%                                                   # <12>
+mutate(ses_fct = forcats::as_factor(ses_txt))   %>%      # <13>
+ungroup()                                                # <14>
+
+# muestra de tabla de figura 3
+data_plot_figure_3 %>%                                   # <15>
+arrange(ach_grp, ses_fct) %>%                            # <15>
+knitr::kable(., digits = 2)                              # <15>
+
+```
+1. Primero creamos clasificamos los valores de `ZACH`, mediante una función de *if_else*. Esta función nos permite clasificar a los estudiantes como alto y bajo desempeño académico, según se encuentren por sobre o bajo la media del conjunto de estudiantes incluidos en los datos.
+
+2. Luego, convertimos la variable anterior a una variable tipo factor. Esto es importante para, al igual que en la figura anterior, tengamos control sobre que orden de presentación toman los valores graficados.
+
+3. Aplicamos la función `forcats::fct_relevel` para brindar el orden que queremos sobre el factor generado anteriormente.
+
+4. Empleamos a la función `cut()`, de modo de clasificar todos los valores observados en la variable `zses` en los rangos deseados. Los rangos deseados los definimos con el vector `c(-9, seq(-3, 2, .5), 9))`
+
+5. Agrupamos los datos, de modo obtener las probabilidades observadas por los factores de interés.
+
+6. La función `summarize()` nos permite generar descriptivos que se entregan en formato tabla, sobre los datos agrupados por los factores definidos.
+
+7. Calculamos la cantidad de observaciones de cada grupo.
+
+8. Calculamos la probabilidad observada de deserción para cada grupo definido, por el cruce de los factores definidos. Es decir, que obtenemos la proporción de estudiantes que presenta valores 1, en la variable `droput`, segun los valores de los factores `ses_grp` y `ach_grp` definidos previamente.
+
+9. Solo para tener diagnóstico, tambien calculamos la mediana de `zses` por celda.
+
+10. Cerramos a la función `summarize()`.
+
+11. Ordenamos a la tabla, segun los valores de `ses_grp`. Esto es iportante porque queremos convertir a esta variable en un factor ordenado en un paso ulterior.
+
+12. Creamos el vector de nombres de la variable `ses_txt` segun los rangos generados por `cut()`, Le daremos el nombre del limite superior de cada rango, empleando los mismos nombres que emplea Osborne (2012) en la figura 3.
+
+13. Creamos la variable factor `ses_fct`, la cual toma el mismo orden generado en el paso 11.
+
+14. Desagrupamos los datos generados.
+
+15. Mostramos como se ve la tabla generada.
+
+
+## Figura con proporciones observadas
+
+Para crear la figura 3, empleamos en gran medida el código empleado para crear a la figura 2, presente en el **Código 15.** No obstante, sobre este código debemos cambiar algunas especificaciones. A continuación anotamos las líneas críticas que hemos cambiado.
+
+**Código 17.** Figura 3 con proporciones observadas.
+
+```{r, echo = TRUE, eval = TRUE, fig.align = 'center'}
+
+# creamos la figura 3
+library(ggplot2)
+figure_3 <- ggplot(data_plot_figure_3,  
+  aes(                                  
+    x = ses_fct,                       # <1>
+    y = droput_prob,                    
+    group = ach_grp,                    
+    color = ach_grp,                    
+    shape = ach_grp                     
+    )) +                                
+geom_line() +                           
+geom_point(size=4) +                    
+scale_color_manual(                     
+  values = c(                           
+    'High ACH' = 'red',                 
+    'Low ACH' = 'black'                 
+    )) +                                
+scale_shape_manual(                     
+  values = c(                           
+    'High ACH' = 19,                    
+    'Low ACH' = 15                      
+    )) +                                
+xlab('Family SES (zscore)') +               # <2>                  
+scale_y_continuous(                         # <3>
+  name = 'Observed percentages of dropout', # <3>
+  breaks = seq(0,1,.05)                     # <3>
+  ) +                                       # <3>
+theme_bw() +                             
+theme(                                   
+  legend.title = element_blank(),        
+  panel.grid.major.x = element_blank(),  
+  panel.grid.minor.y = element_blank(),  
+  panel.grid.major.y =                               
+  element_line(linewidth = .25, colour = "grey70")   
+  )                                                  
+
+# mostrar la figura 2
+figure_3  # <4>
+
+
+```
+
+1. En el eje x, incluimos a la variable `ses_fct` que creamos anteriormente.
+
+2. Agregamos el texto del eje x.
+
+3. En el argumento `scale_y_continuous` le damos el nombre al eje y, y especificamos los valores queremos que se muestren.
+
+4. Escribimos en consola al nombre del objeto de la figura, `figure_3` para la figura generada sea mostrada.
+
+# Figura 4: Probabilidades esperadas
+
+Osborne (2012) argumenta que una mejor manera de comunicar los resultados de un modelo de regresión, especialmente para el caso de una interacción es emplear las probabilidades condicionales al modelo. Es decir, graficar los porcentajes esperados segun los valores de interés de las covariables empleadas en el modelo.
+
+El autor genera la siguiente gráfica para ilustrar su punto.
+
+![Figura 4: Interaction of achievement and SES predicting dropout graphed as probabilities](Osborne_2012_figure_4.jpg){width=400px fig-align="center"}
+
+La oposición que tiene el autor al uso de los logits para generar las gráficas de comunicación de resultados, es que la escala de logits expresa diferencias que en escala de probabilidades condicionales (i.e. porcentajes esperados), podrían ser nominalmente y visualmente mucho más grandes.
+
+En particular, la diferencia en logits observadas entre los estudiantes de bajo nivel socioeconómico es mucho menor, a como se observa esta diferencia en las probabilidades condicionales.
+
+## Tabla de proporciones esperadas
+
+En la siguiente sección vamos a emplear el codigo que genera la tabla de logits esperados, generada en el **Código 14**, y además vamos a convertir estos logits es probabilidades condicionales. Para estos propósitos vamos a emplear la siguiente formula:
+
+$$Pr(y = 1) = \frac{1}{1 + \exp(-\hat{\beta}_{0})}$$
+
+**Código 18.** Tabla de valores predichos para Figura 2.
+
+```{r, echo = TRUE, eval = TRUE}
+
+
+# creamos tabla básica con los logits esperados
+data_plot <- data.frame(                                      # <1>
+x_var = c('Low SES', 'High SES', 'Low SES','High SES'),       # <1>
+y_var = c(e_logit_1, e_logit_2, e_logit_3, e_logit_4),        # <1>
+group = c('Low ACH', 'Low ACH', 'High ACH','High ACH')        # <1>
+)                                                             # <1>
+
+# reordenamos a los valores del factor ses
+data_plot_figure_4 <- data_plot %>%                           # <2>
+mutate(ses_grp = as.factor(x_var)) %>%                        # <2>
+mutate(ses_grp =                                              # <2>
+  forcats::fct_relevel(ses_grp,c('Low SES', 'High SES'))      # <2>
+  ) %>%                                                       # <2>
+mutate(ach_grp = as.factor(group)) %>%                        # <3>
+mutate(ach_grp =                                              # <3>
+  forcats::fct_relevel(ach_grp,c('Low ACH', 'High ACH'))      # <3>
+  ) %>%
+mutate(expected_prob = 1/(1+(exp(-y_var))))                   # <4>
+# mostrar la tabla generada
+knitr::kable(data_plot_figure_4, digits = 3)                  # <5>
+
+```
+
+1. Con estas líneas nos encontramos generando la tabla de estimados, empleando el mismo método que hemos empleado en el **Código 13**, empleando directamente a la función `data.frame`.
+
+2. Sobre la misma tabla creada anteriormente, necesitamos crear una variable de tipo factor, de modo que podamos darle un orden discrecional a la manera en que se ordena el eje X de la figura 2. De lo contrario `ggplot2` va colocar como primer valor al grupo que posea el nombre que aparece primero por orden alfabético. En este caso al grupo `High SES`.
+
+3. Procedemos de la misma forma con la variable `group`. Esto nos permite darle el orden que deseemos a la legenda presente en la figura 2. En particular, queremos que `Low ACH`, aparezca primero, y luego aparezca `High ACH` en la legenda de los puntos y las líneas de figura 2.
+
+4. Aplicamos la formula de conversión de logits esperados a probabilidades condicionales $Pr(y = 1) = \frac{1}{1 + \exp(-\hat{\beta}_{0})}$
+
+5. Finalmente, con la última línea desplegamos la tabla creada con la función `knitr::kable()`, para inspeccionar si luce como esperamos.
+
+
+## Figura con proporciones esperadas
+
+
+**Código 19.** Crear figura 4 con `ggplot2`
+
+```{r, echo = TRUE, eval = TRUE, fig.align = 'center'}
+
+# creamos la figura 2
+library(ggplot2)
+figure_4 <- ggplot(data_plot_figure_4,  # <1>
+  aes(                                  
+    x = ses_grp,                        
+    y = expected_prob,                  # <2>
+    group = ach_grp,                    
+    color = ach_grp,                    
+    shape = ach_grp                     
+    )) +                                
+geom_line() +                           
+geom_point(size=4) +                    
+scale_color_manual(                     
+  values = c(                           
+    'High ACH' = 'red',                 
+    'Low ACH' = 'black'                 
+    )) +                                
+scale_shape_manual(                     
+  values = c(                           
+    'High ACH' = 19,                    
+    'Low ACH' = 15                      
+    )) +                                
+xlab('Family SES (zscore)') +           # <3>
+scale_y_continuous(                     # <4>
+  name = 'Probability of dropping out', # <4>
+  breaks = seq(0,1,.1),                 # <4>
+  limits = c(0,.6)                      # <4>
+  ) +                                    
+theme_bw() +                             
+theme(                                   
+  legend.title = element_blank(),        
+  panel.grid.major.x = element_blank(),  
+  panel.grid.minor.y = element_blank(),  
+  panel.grid.major.y =                              
+  element_line(linewidth = .25, colour = "grey70")  
+  )                                                 
+
+# mostrar la figura 2
+figure_4  # <5>
+
+```
+
+1. Llamamos la tabla de datos con las probabilidades condicionales `data_plot_figure_4`.
+
+2. Especificamos al vector con los valores de probabilidades condicionales `expected_prob`.
+
+3. Agregamos el texto que aparece en el eje x.
+
+4. Cambiamos el titulo del eje y, y especificamos los valores que queremos mostrar en este eje.
+
+5. Llamamos a la `figura_4` en consola, para mostrar a la figura resultante.
+
+## Figuras comparadas
+
+Para hacer más explicito el punto de Osborne (2012) vamos a comparar lado a lado las figuras 2 y 4.
+
+```{r, echo = TRUE, eval = TRUE, fig.align = 'center'}
+
+# reorganizar las figuras generadas
+plot_in_wide <- cowplot::plot_grid(
+  cowplot::plot_grid(
+    figure_2 + 
+      ggtitle('Plot en\nlogits esperados') + 
+      theme(legend.position = 'none'),
+    figure_4 + 
+      ggtitle('Plot en\nprobabilidades condicionales') + 
+      theme(legend.position = 'none'),
+    ncol=2, nrow = 1
+  ),
+  cowplot::get_legend(
+    figure_2 + 
+    theme(legend.position = "bottom")
+    ),
+    ncol=1, rel_heights=c(.95, .05)
+  )
+
+# mostrar a las figuras generadas
+plot_in_wide
+
+```
+En el caso de la figura generada con los logits esperados podriamos concluir que la diferencia entre los estudiantes de alto nivel socioeconómico segun su desempeño académico (alto y bajo) es donde diferencias de mayor tamaño. Lo anterior, porque la distancia en logits, entre los "High SES" de "High ACH" y de "Low ACH" es más grande que entre los "Low SES". En contraste, en la figura que emplea a las probabilidades condicionales la diferencia de mayor tamaño se observa entre los estudiantes de nivel socioeconómico bajo ("Low SES"), condicional a su desempeño académico ("High ACH" vs. "Low ACH").
+
+Osborne (2012) compara puntos esperados esperados generados con un modelo de regresión logística, en escala de probabilidad para ilustrar la interacción entre `ZACH:zses`. Obtiene estos resultados esperados en escala de probabilidad esperada, condiciona a ciertos valores especificados, a -2SD y +2SD para cada factor. Esta aplicación, es un caso especial de un efecto marginal a valores específicos (*marginal effects at representative values*, ver Heiss, 2022).
+
+## Sobre la comunicación de resultados
+
+Cuando las diferencias de distancias entre estimados, o puntos generados por un modelo no son equivalentes entre escalas, la escala de logits (log odds) y la escala de probabilidades (porcentajes, proporciones), se habla de que los estimados no son invariantes a sus conversiones a otraas escalas. Un escenario similar ocurre con los modelos de regresión lineal, cuando se interpretan los coeficientes estandarizados, en contraste a los coeficientes no estandarizados. Hay casos límite en que las diferencias por sobre cero, se observan en una escala, pero no en otra. De esta forma es importante ser consistentes con la cifra empleada para realizar las inferencias. Es decir, si la afirmación de que dos variables se encuentran relacionadas, o si dos grupos son diferentes respecto a una variable de respuesta, es importante indicar que estamos emplando para concluir que hay una relación o diferentes de interés (e.g., logits, probabilidades condicionales, odds ratio u otra cifra).
+
+Debido a que los estimados en logits, y en odds ratio no son necesariamente comparables entre modelos ajustados (Mood, 2010), es común que en la comunicación de resultados de modelos de regresión logística se recurra a otras formas de ilustrar el tamaño de los efectos esperados, como por ejemplo presentar resultados en escala de respuesta, i.e., en porcentajes esperados. Producir indicadores de tamaño de efecto con estimados modelos de regresión logística, otros modelos generalizados, posee diferentes alternativas, y no todas estas implican a los mismos resultados que los lectores tienden a suponer (Hanmer, et al, 2013; Heiss, 2022; Mood, 2010; Muller et al., 2014). Dee esta forma la comunicación de resultados de modelos de regresión logística requiere que los investigadores guarden consideración a los propósitos de la investigación en curso, y las características que las diferentes formas de presentar relaciones y diferencias posen según el modelo empleado. 
+
+El uso de los probabilidades condicionales a valores particulares de las variables de interés, es una forma de presentar resultados entre otras alternativas.
+
+
+# Referencias
+
+
+Bryer, J. (2021) Visual Introduction to Maximum Likelihood Estimation. Retrieved from https://htmlpreview.github.io/?https://github.com/jbryer/visualMLE/blob/master/doc/mle.html
+
+Centro de Estudios Mineduc. (2020). Deserción escolar: diagnóstico y proyección en tiempos de pandemia. Documento de trabajo, Centro de Estudios Mineduc, 1(Consultado 2023 May 15), pp. 1–22. Retrieved from https://centroestudios.mineduc.cl/wp-content/uploads/sites/100/2020/10/DOCUMENTO-DE-TRABAJO-22_2020_f01.pdf
+
+Hanmer, M. J., & Ozan Kalkan, K. (2013). Behind the Curve: Clarifying the Best Approach to Calculating Predicted Probabilities and Marginal Effects from Limited Dependent Variable Models. American Journal of Political Science, 57(1), 263–277. https://doi.org/10.1111/j.1540-5907.2012.00602.x
+
+Heiss, A. (2022) Marginalia: A Guide to Figuring Out What the Heck Marginal Effects, Marginal Slopes, Average Marginal Effects, Marginal Effects at the Mean, and All These Other Marginal Things Are. May 20, 2022. https://doi.org/10.59350/40xaj-4e562.
+
+Masyn, K. E. (2013). Latent Class analysis and finite mixture modeling, in: T. D. Little (Ed.), The Oxford Handbook of Quantitative Methods, pp. 551–611. New York, NY: Oxford University Press. Retrieved from http://books.google.com.au/books?id=FjNCnQEACAAJ
+
+Rabe-Hesketh, S., & Skrondal, A. (2012). Multilevel and Longitudinal Modeling Using Stata, Volumes I and II, Third Edition. College Station, TX: Stata Press.
+
+Mood, C. (2010). Logistic regression: Why we cannot do what We think we can do, and what we can do about it. European Sociological Review, 26(1), 67–82. https://doi.org/10.1093/esr/jcp006
+
+Muller, C. J., & Maclehose, R. F. (2014). Estimating predicted probabilities from logistic regression: Different methods correspond to different target populations. International Journal of Epidemiology, 43(3), pp. 962–970.
+
+Osborne, J. W. (2011). Best practices in using large, complex samples: The importance of using appropriate weights and design effect compensation. Practical Assessment, Research and Evaluation, 16(12), pp. 1–7.
+
+Osborne, J. W. (2012). Logits and tigers and bears , oh my! A brief look at the simple math of logistic regression and how it can improve dissemination of results. Practical Assessment, Research and Evaluation, 17(June 2012), pp. 1–10.
+
+Osborne, J. W. (2015). Best Practices in Logistic Regression. Washington D.C., United States: Sage Publications, Inc.
+
+Wickham, H. (2008). Practical tools for exploring data and models. Retrieved from http://had.co.nz/thesis/practical-tools-hadley-wickham.pdf
+
+Wickham, H. (2009). ggplot2: elegant graphics for data analysis. Springer
+
+
+
+
+# Anexos
+
+## Anexo 1: interacción
+
+### Interacción empleando `var_1:var_2`
+
+```{r, echo = TRUE, eval = TRUE}
+
+# modelo de regresión logística con un predictor binario
+glm(dropout ~ ZACH + zses + ZACH:zses, 
+  data = data_nels, 
+  family = "binomial") %>%                                          
+broom::tidy()  %>%                                                  
+mutate(odds_ratio = exp(estimate))  %>%                             
+knitr::kable(., digits = 3)                                         
+
+```
+
+### Interacción empleando `var_1*var_2`
+
+```{r, echo = TRUE, eval = TRUE}
+
+# modelo de regresión logística con un predictor binario
+glm(dropout ~ ZACH + zses + ZACH:zses, 
+  data = data_nels, 
+  family = "binomial") %>%                                          
+broom::tidy()  %>%                                                  
+mutate(odds_ratio = exp(estimate))  %>%                             
+knitr::kable(., digits = 3)                                         
+
+```
+
+
+### Interacción empleando `mutate(int = var_1*var_2)`
+
+```{r, echo = TRUE, eval = TRUE}
+
+# modelo de regresión logística con un predictor binario
+data_nels %>%
+mutate(int = ZACH*zses) %>%
+glm(dropout ~ ZACH + zses + int, 
+  data = ., 
+  family = "binomial") %>%                                          
+broom::tidy()  %>%                                                  
+mutate(odds_ratio = exp(estimate))  %>%                             
+knitr::kable(., digits = 3)                                         
+
+```

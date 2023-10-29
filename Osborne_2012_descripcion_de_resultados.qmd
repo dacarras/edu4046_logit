@@ -1,0 +1,995 @@
+---
+title: "Regresión logística en R"
+subtitle: "Descripción de resultados, empleando datos presentes en Osborne (2012)"
+toc: true
+toc-expand: true
+toc-title: Contenidos
+author:
+  - name: https://dacarras.github.io/
+    affiliations:
+    - name: Centro de Medición MIDE UC, Pontificia Universidad Católica de Chile
+format:
+  html:
+    code-overflow: wrap
+    code-line-numbers: true
+    code-annotations: below
+    code-link: true
+    embed-resources: true
+    grid:
+      margin-width: 400px
+css: output_background_color_style.css
+mainfont: Noto Sans
+monofont: Source Code Pro
+---
+
+```{r, echo = FALSE, eval = TRUE}
+
+# hide messages from dplyr
+suppressPackageStartupMessages(library(dplyr))
+
+# hide NA from knitr table
+options(knitr.kable.NA = '')
+
+# suppress dplyr group warnings
+options(dplyr.summarise.inform = FALSE)
+
+```
+
+# Introducción
+
+El presente documento ilustra cómo describir resulados de regresión logística, empleando los datos y resultados presentes en Osborne (2012):
+
+>Osborne, J. W. (2012). Logits and tigers and bears , oh my! A brief look at the simple math of logistic regression and how it can improve dissemination of results. Practical Assessment, Research and Evaluation, 17(June 2012), pp. 1–10.
+
+En el articulo de Osborne (2012) se emplean datos del estudio NELS88 (https://nces.ed.gov/surveys/nels88/) de 1988, en el cual se siguen a estudiantes de 8vo grado (14 años aproximadamente), hasta el momento de graduación. Y con estos datos se distingue entre estudiantes que completan sus estudios y se graduan, en contraste a los estudiantes que interrumpen su trayectoria escolar. En resumen, la variable de respuesta, o variable dependiente, que se emplea se llama `dropout`. En esta se codifica como cero a los estudiantes que se graduan (i.e., completan la secundaria), y como uno a los estudiantes que interrumpen su trayectoria escolar. 
+
+Los datos que se emplean en la present guía, pueden ser obtenidos empleando el siguiente link:
+
+- [https://www.dropbox.com/s/s1y0qkn8vuebqvr/NELS_data_pulll_2.SAV?dl=0](https://www.dropbox.com/s/s1y0qkn8vuebqvr/NELS_data_pulll_2.SAV?dl=0)
+
+
+Para describir los resultados, se siguen cómo guía a las recomendaciones presentes en Huck (2012), O’Connell et al. (2019), y las observaciones Niu (2020), a la practica del reporte de resultados encontrados en la literatura de la investigación educacional.
+
+>done!
+
+# Flujo de trabajo
+
+- 1. Abrir los datos
+- 2. Preparar los datos
+- 3. Ajustar Modelos
+- 4. Extraer indicadores de ajuste
+- 5. Crear tablas de resultados
+- 6. Crear figuras de resultados
+- 7. Descripcion de resultados
+
+Para los puntos 1 a 6, vamos a re-utilizar código desarollado en la guia anterior.
+
+# 1. Abrir datos
+
+Primero procedemos a abrir los datos desde web link.
+
+**Código 1.** Abrir los datos desde URL
+
+```{r, echo = TRUE, eval = TRUE}
+
+# crear objeto con la ubicación de los datos
+file_url <- 'https://www.dropbox.com/s/s1y0qkn8vuebqvr/NELS_data_pulll_2.SAV?dl=1' #
+
+# abrir los datos empleando haven
+data_nels <- haven::read_sav(file_url)
+
+# inspeccionar datos cargados en R
+dplyr::glimpse(data_nels)
+
+```
+
+# 2. Preparar datos
+
+Vamos a crear un objeto llamado `data_model`, para alojar los datos en los que vamos a encontrar las observaciones que estaremos analizando. Este objeto es una copia de los datos originales, la cual solo contiene los datos que vamos a analizar. Este paso, es solo una buena práctica de analisis de datos la cual nos asegura que siempre podamos volver a nuestros datos originales, en caso de que quisieramos revocar un cambio realizado. Además, emplearemos nombres más cortos para las variables en uso (i.e., de unos 4 caracteres), y nombres homogeneos en miníscula, para que sea más facil escribir el código que emplearemos para producir los resultados.
+
+**Código 2.** preparar datos
+
+```{r, echo = TRUE, eval = TRUE}
+
+# crear datos analizables
+library(dplyr)
+data_model <- data_nels %>%
+              # crear variable de respuesta
+              mutate(drop = dropout) %>%
+              # covariables
+              mutate(zach = ZACH) %>%
+              mutate(zses = zses) %>%
+              mutate(int  = zses*zach) %>%
+              # selección de variables en uso
+              dplyr::select(drop, zach, zses, int)
+
+```
+
+::: {.callout-note title="Nota"}
+En R los nombres de objetos *case sensitive*. Lo anterior quiere decir que a pesar de que dos palabras digan lo mismo, para R son objetos diferentes, si se diferencian por el uso de minúsculas y mayúsculas. De esta forma `variable`, `Variable`, y `VariaBle` son todos objetos diferentes. El presente código se apega al ("tidyerse style")[https://style.tidyverse.org/index.html]. En este, todo lo de código se escribe con minúsculas, y se emplean `_` en caso de querer unir palabras.
+:::
+
+Para los modelos que vamos a ajustar, solo vamos a emplear 4 variables:
+
+- Variable dependiente o de respuesta. 
+  + `drop`
+    - 0 = termina la secundaria
+    - 1 = no concluye la educación secundaría
+
+- Variables independientes
+  + `zach`
+    - 0 = media
+    - 1 = desviación estandar
+    - Variable estandarizada
+    - Mayor valor, mayor desempeño académico
+      + Valor compuesto del desempeño escolar de 8vo grado
+
+  + `zses`
+    - 0 = media
+    - 1 = desviación estandar
+    - Variable estandarizada
+    - Mayor valor, mayor desempeño nivel socioeconómico de la familia de los estudiantes.
+      + SES es una variable continua, generada como el compuesto de la educación de madre y padre, la ocupación de ambos padres, y el ingreso del hogar (ver NCES, 2018, p5)
+
+  + `int`
+    - es el multiplo de `zses` y de `zach`, de tal forma que `zses*zach`.
+    - Este término nos sirve para evaluar la posible interacción entre nivel socioeconómico, y desempeño académico de los estudiantes, en relación a la deserción escolar (*dropout*).
+    
+
+# 3. Ajustar Modelos
+
+En el siguiente código vamos a ajustar todos los modelos posibles, de forma incremental. Primero incluimos las covariables por si solas, y luego las variables juntas, y luego incluimos el término de interacción.
+
+**Código 3.1** ajustar modelos
+
+```{r, echo = TRUE, eval = TRUE}
+
+# ajustar modelos
+m00 <- glm(drop ~ 1, data = data_model, family = 'binomial')
+m01 <- glm(drop ~ 1 + zach, data = data_model, family = 'binomial')
+m02 <- glm(drop ~ 1 + zses, data = data_model, family = 'binomial')
+m03 <- glm(drop ~ 1 + zach + zses, data = data_model, family = 'binomial')
+m04 <- glm(drop ~ 1 + zach + zses + int, data = data_model, family = 'binomial')
+
+# sequencia completa de modelos
+texreg::screenreg(
+  list(m00, m01, m02, m03, m04), 
+  single.row = FALSE
+  )
+
+```
+En el paso anterior, ajustamos todos los modelos posibles. Esto nos da una vista panóramica de la relación de cada una de las variables con respecto a la variable de respuesta. El paso anterior, nos puede dar un diagnóstico rápido si las variables presentan varianza compartida, y si pudiera existir problemas de colinealidad (ver Anexos: *Colinealidad*).
+
+Ahora, solo ajustaremos los modelos que vamos a emplear para la descripción de resultados.
+
+**Código 3.2** ajustar modelos seleccionados.
+
+```{r, echo = TRUE, eval = TRUE}
+
+# sequencia seleccionada de modelos
+texreg::screenreg(
+  list(m00, m03, m04), 
+  single.row = FALSE
+  )
+
+```
+
+Para obtener los odds ratio, vamos a emplear dos librerias. Una de ellas es la librería [`blorr`](https://blorr.rsquaredacademy.com/articles/introduction), y la otra es la librería [`broom`](https://broom.tidymodels.org/). `blorr` es una librería para ajustar modelos de regresión logística, que posee diferentes funciones para obtener diferentes aspectos de interés, como relaciones bivariadas, odds ratio, indicadores de ajuste, entre otros aspectos. `broom`, por su parte, es una librería general para extraer coeficientes e indicadores de ajuste, en formato tabla desde varios modelos en R.
+
+Con los códigos siguientes, vamos a obtener los odds ratio implicados por el modelo ajustado. Recordemos que los odds ratio son solo los coeficientes exponenienciados. Es decir:
+
+$\text{odds ratio }= exp(\hat{\beta}_{1-n})$
+
+**Código 3.3** odds ratio.
+
+```{r, echo = TRUE, eval = TRUE}
+
+# obtener odds ratio con blorr
+blorr::blr_regress(m04, odd_conf_limit = TRUE)
+
+# obtener odds ratio con broom
+broom::tidy(m04, conf.int = TRUE, exponentiate = TRUE)
+
+```
+
+
+# 4. Extraer indicadores de ajuste
+
+Los modelos de regresión logística, poseen diferentes indicadores de ajuste. Entre estos indicadores tenemos:
+
+- La prueba global de Likelihood ratio
+  + Esta prueba global compara si la reducción de devianza se encuentra por sobre el azar.
+  + Es muy similar a la prueba de ANOVA de regresion lineal, en que se compara el modelo nulo, en contraste al modelo seleccionado con predictores.
+- pseudo R^2 o R^2 generalizados
+  + La regresión logística no posee un único indicador de varianza explicada, tipo R^2
+  + En cambio, existen una colección de estos indicadores tales como:
+    + McFadden's R^2, Cox-Snell R^2, Efron R^2, McKelvey & Zavoinas R2, entre otros.
+- Indicadores de calidad de la clasificación del modelo
+  + En estos indicadores comúnmente se cuenta la cantidad de $Pr(y=1)$ de $Pr(y=0)$ sobre la cantidad de observaciones. Con estos se producen indicadores de sensibilidad, especificidad y precisión de clasificación.
+  + Una forma de obtener estos indicadores, es mediante una tabla de "confusión" (i.e., *confusion matrix*). Esta es una tabla de contigencia que cruza los valores observados de $y$, en contraste a los valores esperados de y ($\hat{y}$).
+
+A continuación revisaremos como se construyen los indicadores de likelihood (LRT), McFadden's R^2, y Efron R^2, y las tablas de clasificación.
+
+## Likelihood Ratio Test (LRT)
+
+La formula de Likelihood ratio es:
+
+$\chi^2_{diff} = -2(LL_{0} - LL{1})$
+
+Donde, 
+
+- $LL_{1}$ = es la loglikelihood del modelo de interés
+- $LL_{0}$ = es la loglikelihood del modelo nulo
+- $\chi^2_{diff}$ = es un valor de $\chi^2$.
+
+Lo que nos entrega esta prueba, es una medida global de discrepancia entre la devianza del modelo nulo, en contraste al modelo de interés. Cuando esta diferencia es muy pequeña, condicional a los grado de libertad, afirmamos que el modelo de interés produce devianzas muy similares a las del modelo que solo contiene al porcentaje de la variable de interés (i.e., el análago del promedio de la regresión lineal). En cambio, cuando esta discrepancia es superior a lo esperado en la distribución de $\chi^2$, entonces afirmamos que el modelo ajusta de mejor manera a los datos.
+
+
+Para obtener este indicador, podemos aplicar el siguiente código.
+
+**Código 4.1.** Likelihood ratio test
+
+```{r, echo = TRUE, eval = TRUE}
+
+# Likelihood ratio test
+anova(m00, m04, test="LRT")  
+
+```
+
+
+::: {.callout-important title="Importante"}
+Las pruebas de Likelihood ratio test son muy importantes, porque son aplicables a cualquier modelo estadístico basado en maxima verosimilitud (i.e., maximum likelihood). Estas pueden ser aplicadas sobre diferentes modelos tales como: regresion lineal, modelos multinivel, modelos de regresion logística, modelos generalizados, confirmatory factor analysis, modelos de respuesta al item, entre otros modelos estimados con *maximum likelihood*.
+:::
+
+
+## McFadden $R^2$
+
+La formula para McFadden R^2, es la siguiente:
+
+$\text{McFadden } R^2 = 1 - \frac{LL_{1}}{LL_{0}}$
+
+Donde, 
+
+- $LL_{1}$ = es la loglikelihood del modelo de interés
+- $LL_{0}$ = es la loglikelihood del modelo nulo
+
+En esta fórmula se comparamos la máxima verosimilitud no atrribuible al modelo, con la máxima verosimilitud del modelo nulo. En otras palabras, estamos comparando que proporción de máxima verosimilitud es capaz de explicar el modelo que hemos ajustado, en contraste a toda la máxima verosimilitud que puede explicar solo el "promedio" o porcentaje de respuesta sobre los datos observados.
+
+Este indicador, no es precisamente una medida de proporción de varianza explicada, pero se comporta de igual manera. Lo anterior, en el sentido de que a medida que se acerca 1, implica un modelo que ajusta bien a los datos; y a medida que se aleja de 1, implica un modelo que predice a los datos observados en menor medida.
+
+Para obtener el McFadden R^2, vamos a emplear un método manual, y otro empleando a la librería [`perfomance`](https://easystats.github.io/performance/) (Lüdecke, et al., 2021).
+
+**Código 4.2.** McFadden R^2
+
+```{r, echo = TRUE, eval = TRUE}
+
+# McFadden R2 via computación manual
+ll_0 <- as.numeric(logLik(m00))
+ll_1 <- as.numeric(logLik(m04))
+
+McFadden_r2 <- 1 - ll_1/ll_0
+McFadden_r2
+
+# McFadden via library(performance)
+performance::r2_mcfadden(m04)
+
+```
+## Horowitz $R^2$
+
+La formula para Horowitz R^2, es la siguiente:
+
+$\text{Horowitz } R^2 = 1 - \frac{LL_{1}-\frac{m}{2}}{LL_{0}}$
+
+Donde, 
+
+- $LL_{1}$ = es la loglikelihood del modelo de interés
+- $LL_{0}$ = es la loglikelihood del modelo nulo
+- $m$ = número de parámetros del modelo, excluyendo al intercepto
+
+**Código 4.3.** Horowitz R^2
+
+```{r, echo = TRUE, eval = TRUE}
+
+# horowitz_r2 R2 via computación manual
+ll_0 <- as.numeric(logLik(m00))
+ll_1 <- as.numeric(logLik(m04))
+
+
+m <- broom::tidy(m04) %>%
+     dplyr::filter(term != '(Intercept)') %>%
+     nrow()
+
+horowitz_r2 <- 1 - (ll_1-(m/2))/ll_0
+horowitz_r2
+
+```
+Este indicador ajuste, puede ser visto como un McFadden $R^2$ corregido por la cantidad de parámetros que posee el modelo ajustado. En estudios de simulaciones, este indicador es menos sensible al tamaño de la muestra, la cantidad de covariables del modelo, y de la cantidad de categorias presentes en la variable de respuesta (i.e., en modelos de más de dos categorías) (Hemmert et al., 2018). Por esta última razón, se lo considera un indicador más ventajoso en contraste a otros indicadores de pseudo $R^2$ para diferentes modelos logit.
+
+
+## Efron's $R^2$
+
+En contraste, Efron's R^2 sigue la racionalidad del R^2 de la regresión lineal. La formula de este indicador, es la siguiente:
+
+
+$\text{Efron's } R^2 = 1 - \frac{\sum{(y_{i}-\pi_{i})^2}}{\sum{(y_{i}-\hat{y})^2}}$
+
+Donde, 
+
+- $y_{i}$ = es el valor observado $y$, para cada fila $i$
+- $\pi_{i}$ = es el valor esperado $y$, para cada fila $i$, dado el modelo de interés
+- $\hat{y}$ = es el valor esperado $y$, por ejemplo $\hat{y} = \frac{\sum{y_{i}}}{n}$
+
+
+**Código 4.4.** Efron's R^2
+
+```{r, echo = TRUE, eval = TRUE}
+
+# Efron R^2 via computación manual
+y_hat <- stats::predict(m04, type = "response")
+y <- data_model$drop
+pr_y <- mean(y)
+
+efron_r2 <- (1 - (sum((y - y_hat)^2)) / (sum((y - pr_y)^2)))
+efron_r2
+
+# Efron R^2 via library(perfomance)
+performance::r2_efron(m04)
+
+```
+
+## McKelvey & Zavoina Pseudo $R^2$
+
+McKelvey & Zavoina Pseudo R^2 puede ser atractivo, porque sigue la lógica de producir una proporción de varianza explicada. En esta aproximación, se asumen que podemos realizar la siguiente descomposición:
+
+$$S_{T}^2 = S_{R}^2 + S_{E}^2$$
+
+Donde,
+
+$S_{T}^2$ es la suma de cuadrados totales (i.e., la varianza total).
+$S_{E}^2$ es la suma de cuadrados generada por el modelo
+$S_{R}^2$ es la suma de cuadrados del error
+
+Para el caso de los modelos de regresión logística la varianza residual de $y$ es fija y se expresa con el siguiente término $\pi^2/3$.
+
+De esta forma el $R^2$ de McKelvey & Zavoina (1975) puede ser expresado para la regresión logística de la siguiente forma:
+
+- Suma de cuadrados esperadas dado el modelo:
+
+$S_{E}^2 = \sum{(\hat{y}_{i}}-\hat{\bar{y}})^2$
+
+- Suma de cuadrados residuales:
+
+$S_{R}^2 = n*\pi^2/3$
+
+- Suma de cuadrados totales:
+
+$S_{T}^2 = \sum{(\hat{y}_{i}}-\hat{\bar{y}})^2 + (n*\pi^2/3)$
+
+Con los términos anteriores podemos construir el R^2 esperado:
+
+$\hat{R^2} = \frac{S_{E}^2}{S_{T}^2}=\frac{\sum{(\hat{y}_{i}}-\hat{\bar{y}})^2}{\sum{(\hat{y}_{i}}-\hat{\bar{y}})^2 + (n*\pi^2/3)}$
+
+**Código 4.5.** McKelvey & Zavoina Pseudo $R^2$
+
+```{r, echo = TRUE, eval = TRUE}
+
+# McKelvey & Zavoina Pseudo R^2 via computación manual (método 1)
+
+## términos
+y_hat <- stats::predict(m04, type = "link")
+bar_y_hat <- mean(y_hat)
+n <- nrow(data_model)
+sigma_2 <- pi^2/3
+
+# suma de cuadrados del modelo
+sse <- sum((y_hat - bar_y_hat)^2)
+# suma de cuadrados totakes
+sst <- sse + n * sigma_2
+
+mzr2_m1 <- sse / sst
+mzr2_m1
+
+# McKelvey & Zavoina Pseudo R^2 via computación manual (método 2)
+
+# formula para obetener varianza de la población (y no de la muestra)
+var_pop <- function(x){
+n <- length(x)
+var_pop <- var(x) * (n - 1)/n
+return(var_pop)
+}
+
+var_star_y <- var_pop(y_hat)
+
+var_star_t <- var_pop(y_hat) + (pi^2)/3
+
+mzr2_m2 <- var_star_y/var_star_t
+mzr2_m2
+
+# McKelvey & Zavoina Pseudo R^2 via performance::r2_mckelvey() (método 3)
+mzr2_m3 <- performance::r2_mckelvey(m04)
+mzr2_m3
+
+
+# Comparación de métodos de calculos empleados
+data.frame(
+method = c('via SSE', 'via Varianza', 'performance::r2_mckelvey'),
+MZ_R2 = c(mzr2_m1, mzr2_m2, mzr2_m3)
+) %>%
+knitr::kable(., digits = 8)
+
+```
+
+
+
+## Indicadores de ajuste
+
+Una forma de obtener cada uno de estos indicadores de ajuste con una sola función es empleando a la función `blorr::blr_model_fit_stats()`. Además, podemos emplear la función `blorr::blr_multi_model_fit_stats`, con la cual podemos comparar los indicadores de ajuste de varios modelos. Finalmente, empleando a `broom::glance()` podemos obtener algunos de los indicadores que se producen con `summary(model)`, pero en formato tabla, lo cual nos puede servir para extraer estadísticos particulares del modelo (e.g., loglikelihood, deviance, AIC, BIC).
+
+**Código 4.6.** Indicadores de ajuste
+
+```{r, echo = TRUE, eval = TRUE}
+
+# indicadores de ajuste con blorr
+blorr::blr_model_fit_stats(m04)
+
+# comparacion de modelos
+blorr::blr_multi_model_fit_stats(m00, m04)
+
+# indicadores de ajuste con broom
+broom::glance(m04)
+
+```
+
+## ¿Qué indicador de Pseudo R emplear?
+
+Si comparamos los diferentes indicadores de pseudo $R^2$ empleados en regresión logística podemos ver que estos difieren en tamaño de manera importante (ver tabla siguiente.
+
+```{r, echo = TRUE, eval = TRUE}
+#| code-fold: true
+#| code-summary: "Código para obtener cada uno de los pseudo R^2"
+
+data.frame(
+pseudo_r2 = c('Effron', 'McFadden', 'Horowitz', 'McKelvey & Zavoina'),
+estimate = c( 
+as.numeric(performance::r2_efron(m04)),
+as.numeric(performance::r2_mcfadden(m04)$R2),
+horowitz_r2,
+as.numeric(performance::r2_mckelvey(m04))),
+racionalidad = c(
+'Reducción de predichos',
+'Reducción de devianza',
+'Reducción de devianza, corregido por la cantidad de parámetros',
+'Reducción de varianza latente'
+)) %>%
+arrange(estimate) %>%
+knitr::kable(., digits = 2, caption = 'Tabla 1: comparación de R^2 para modelo `m04`')
+
+```
+No existe un consenso transversal en la literatura, respecto a cual indicador $R^2$ es más adecuado (O'Connel et al, 2019). No obstante, Menard (2000) plantea que McFadden $R^2$ puede ser preferible por dos razones: a) este es un indicador que puede ser interpretado como una medida de reducción de error, y b) que este indicador es insensible a la tasa de prevalencia del evento de interés, es decir el $Pr(y = 1)$. Por su parte Hemmert et al. (2018), recomienda al indicador de pseudo de R^2 de Horowitz (1982), debido a que este indicador es menos sensible al tamaño muestral, y la distribución de categorias de la variable de respuesta.
+
+No obstante, si el uso de estos indicadores, es solo comparación entre modelos ajustados sobre los mismos datos, y sobre la misma variable dependiente, cualquiera de estos indicadores debiera al propósito de ayudar a la selección de modelos.
+
+O'Connel et al. (2019) por su parte, plantea que el indicador McFadden $R^2$ es uno de los indicadores más intuitivos como medida de mejora de ajuste, dado el modelo de interés.
+
+De todas formas, lo más importante a tener en cuenta, es el propósito para el cual se quiera emplear uno de estos indicadores, e indicar claramente cual es el indicador que esta siendo empleado (Menard, 2000; Hemmert et al., 2018). En otras palabras, la recomendación a seguir es siempre reportar el ajuste del modelo, indicando explicitamente cuál de estos indicadores esta siendo empleado.
+
+::: {.callout-tip title="Tip"}
+En el reporte de resultado de regresión logística, en el primer párrafo de descripción de resultados sobre el ajuste de modelo, se requiere indicar claramente el indicador de pseudo $R^2$ que esta siendo reportado.
+:::
+
+## Calidad de la clasificación
+
+Uno de los indicadores más sencillos de calidad de clasificación es la proporción de casos predichos en contraste a la cantidad de observaciones. Este indicador puede ser obtenido de variadas maneras. La forma más sencilla, consiste en producir una tabla de contingencia entre los valores predichos, y los valores observados. Se suman los valores correctamente predichos de cada categoria, y se dividen por la cantidad de observaciones.
+
+Coincide, que para el caso de regresión logistica, este es el mismo indicador de cantidad de clasificaciones correctas o *Count* $R^2$. 
+
+Otro indicador de clasificación, es el indicador $tau_{p}$ Menard (2000, 2002). Este es un indicador, basado en clasificaciones basadas en probabilidades no simétricas (Ma & Redmond, 1995). Este indicador consiste en la proporción de clasificaciones correctas ajustando por las probabilidades a priori. Es decir, la tasa de prevalencia del evento, previo a que tengamos información de las covariables. Este segundo término se obtiene como las probabilidades marginales de la distribución de referencia (i.e., el porcentaje del evento de interes, obtenido desde la variable e respuesta). En la literatura de clasificación este indicador tambien se lo conoce como Klecka's $\tau$. De forma análoga, tambien es posible producir $\tau_{e}$, el cual ajusta las clasificaciones empleando una clasificación al azar. La cual, en el caso del modelo de regresión logística es equivalente a .5 (1/cantidad de valores posibles).
+
+A continuación, incluimos código para producir a los indicadores de:
+
+- count $R^2$ = Porcentaje de clasificacion correcta `count_r2`
+- Accuracy = Porcentaje de clasificacion correcta, sobre el total `accuracy`
+- $\tau_{p}$ = Porcentaje de classifiación correcta, ajustado por la prevalencia ($\tau_{p}$)
+- $\tau_{e}$ = Porcentaje de classifiación correcta, ajustado por azar ($\tau_{e}$)
+- $\lambda_{p}$ Porcentaje de classifiación correcta, ajustado por categoria modal ($\lambda_{p}$)
+
+::: {.callout-important title="Importante"}
+Es importante señalar que los indicadores de clasificación no son calculados por defecto por diferentes paquetes estadísticos. Y por tanto, hay menos acuerdo en la literatura respecto a cual de estos indicadores es más adecuado reportar (O'Connel et al, 2019). Menard (2000) recomienda al indicador de $\tau_{p}$, y al count $R^2$ o porcentaje de clasificación correctas por sobre el total. En esta guia, emplearemos este indicador para crear el reporte de resultados.
+:::
+
+**Código 4.7.** Indicadores de clasificación
+
+```{r, echo = TRUE, eval = TRUE}
+
+# count pseudo R2
+blorr::blr_model_fit_stats(m04)$count_r2
+
+# accuracy
+blorr::blr_confusion_matrix(m04)$accuracy
+
+# calculos manuales
+y_obs <- m04$y
+y_hat <- dplyr::if_else(predict(m04, type = "response") >= 0.5, 1, 0)
+n_obs <- length(y_obs)
+
+f_ii <- dplyr::if_else(y_obs == y_hat,1,0)
+
+## count pseudo R2
+count_r2 <- sum(f_ii)/n_obs
+count_r2
+
+## tau_e Ma & Redmond (1995)
+p_o  <- sum(f_ii)/n_obs
+p_re <- 0.5
+# Note: clasification by chance
+
+tau_e <- (p_o - p_re)/(1-p_re)
+tau_e
+
+## tau p Ma & Redmond (1995)
+p_o  <- sum(f_ii)/n_obs
+p_rp <- mean(y_obs) 
+# Note: marginal distribution of the reference data
+
+tau_p <- (p_o - p_rp)/(1-p_rp)
+tau_p
+
+## tau p Klecka's (1980)
+n_p <- sum(y_obs)
+n_q <- n_obs - sum(y_obs)
+
+tau_num  <- sum(f_ii) - pr_y*(n_p + n_q)
+tau_den <- n_obs - pr_y*(n_p + n_q)
+tau_p <- tau_num/tau_den
+tau_p
+
+## tau_p Menard (2001)
+errors_without_model <- 1 - p_rp
+errors_with_model <- 1-p_o
+
+tau_p <- (errors_without_model - errors_with_model)/errors_without_model
+tau_p
+
+## lambda p (Menard, 2000)
+n_mode <- sum(y_obs)
+lambda_num  <- n_obs - sum(f_ii)
+lambda_den  <- n_obs - n_mode
+lambda_p <- 1 - lambda_num/lambda_den
+lambda_p
+
+
+```
+
+# 5. Tabla de resultados
+
+Para producir una tabla general de resultados vamos a emplear dos estrategias. Una de ellas, consiste en emplear tablas de que producen librerias. En este caso, vamos a emplear las tablas que produce las funciones `texreg::screenreg()`, `blorr::blr_regress()`, y `broom::tidy()`. Luego, como segunda estrategia, vamos a crear una tabla con los contenidos que queremos que contenga la tabla. Comúnmente, una tabla de resultados de regresión logística posee:
+- los nombres de la covariables
+- los coeficientes de regresión logística
+- los errores estandares de los coeficientes
+- los resultados de la prueba estadística sobre los coeficientes
+  - incluyendo o no, al resultado de esta prueba
+  - los valores p, o en su reemplazo a los p valor resumidos empleando `*`
+- los coeficientes en *odds ratio*.
+
+Con los siguientes códigos vamos a producir la tabla general.
+
+**Código 5.1.** tabla de resultados
+
+```{r, echo = TRUE, eval = TRUE}
+
+# metodo 1: screenreg
+texreg::screenreg(
+  list(m04), 
+  single.row = TRUE
+  )
+
+# metodo 2: blorr
+blorr::blr_regress(m04, odd_conf_limit = TRUE)
+
+# metodo 3: broom::tidy()
+broom::tidy(m04) %>%
+mutate(OR = exp(estimate))  %>%
+knitr::kable(., digits = 3)      
+
+```
+
+El código siguiente emplea a los resultados parciales que genera `broom::tidy()`. La ventaja que posee esta fucnión consiste en que el producto de su aplicación es una tabla de resultados, o *data_frame*. Y como tal, nos permite realizar calculos sobre ella. Empleando esta última propiedad, cambiamos el formato de los resultados entregados, de modo que la tabla final se asemeje a los contenidos de una tabla de resultados de formato de manuscrito.
+
+**Código 5.2.** tabla de resultados via `broom::tidy()`
+
+```{r, echo = TRUE, eval = TRUE}
+
+# metodo 4: broom::tidy() y edición de campus
+
+## función para decinir 2 decimales
+decimales <- function (x, k) {
+    format(round(x, k), nsmall = k)
+}
+
+
+## tabla con estimados
+tabla_1 <- broom::tidy(m04) %>%
+mutate(text = case_when(
+term == '(Intercept)' ~ 'intercepto',
+term == 'zach'        ~ 'logro académico (puntaje z)',
+term == 'zses'        ~ 'nivel socioeconómico (puntaje z)',
+term == 'int'         ~ 'interacción'
+)) %>%
+mutate(e  = decimales(estimate, 2)) %>%
+mutate(se = paste0('(', decimales(std.error, 2), ')')) %>%
+mutate(star = case_when(
+p.value <  .001 ~ '***',
+p.value <  .01  ~ '** ',
+p.value <  .05  ~ '*  ',
+p.value >= .05  ~ '   '
+)) %>%
+mutate(odds_ratio = decimales(exp(estimate),2))  %>%
+mutate(reverse_odds_ratio = decimales(1/exp(estimate),2))  %>%
+mutate(odds_ratio = case_when(
+text == 'intercepto' ~ '',
+text != 'intercepto' ~ odds_ratio
+)) %>%
+mutate(reverse_odds_ratio = case_when(
+text == 'intercepto' ~ '',
+text != 'intercepto' ~ reverse_odds_ratio
+)) %>%
+dplyr::select(text, e, se, star, odds_ratio, reverse_odds_ratio)
+
+
+tabla_1 %>%
+knitr::kable(., digits = 2)     
+
+## guardar tabla a excel
+tabla_1 %>%
+openxlsx::write.xlsx(., 
+  'tabla_1_resultados.xlsx', 
+  overwrite = TRUE)
+
+```
+
+
+
+# 6. Figura
+
+**Código 6.** producir figura de resultados esperados
+
+```{r, echo = TRUE, eval = TRUE}
+
+# valores de interés
+lo_ach <- -2
+hi_ach <-  2
+lo_ses <- -2
+hi_ses <-  2
+
+# coeficientes en logits del modelo
+b0 <- -3.174
+b1 <- -1.174
+b2 <- -0.857
+b3 <- -0.209
+
+# logits esperados a cada conjunto de valores de interés
+e_logit_1 <- b0 + b1*(lo_ach) + b2*(lo_ses) + b3*(lo_ach*lo_ses)
+e_logit_2 <- b0 + b1*(lo_ach) + b2*(hi_ses) + b3*(lo_ach*hi_ses)
+e_logit_3 <- b0 + b1*(hi_ach) + b2*(lo_ses) + b3*(hi_ach*lo_ses)
+e_logit_4 <- b0 + b1*(hi_ach) + b2*(hi_ses) + b3*(hi_ach*hi_ses)
+
+
+# creamos tabla básica con los logits esperados
+data_plot <- data.frame(     
+x_var = c('Bajo NSE (-2 DS)',
+          'Alto NSE (+2 DS)',
+          'Bajo NSE (-2 DS)',
+          'Alto NSE (+2 DS)'),       
+y_var = c(e_logit_1, e_logit_2, e_logit_3, e_logit_4),
+group = c('Bajo Logro Académico (-2 SD)', 
+          'Bajo Logro Académico (-2 SD)', 
+          'Alto Logro Académico (+2 SD)',
+          'Alto Logro Académico (+2 SD)')
+)                                                     
+
+# reordenamos a los valores del factor ses
+data_plot_figure_1 <- data_plot %>%                           
+mutate(ses_grp = as.factor(x_var)) %>%                        
+mutate(ses_grp =                                              
+  forcats::fct_relevel(ses_grp,
+    c('Bajo NSE (-2 DS)', 'Alto NSE (+2 DS)')
+    )) %>%                                                    
+mutate(ach_grp = as.factor(group)) %>%                        
+mutate(ach_grp =                                              
+  forcats::fct_relevel(ach_grp,
+    c('Bajo Logro Académico (-2 SD)', 
+      'Alto Logro Académico (+2 SD)')
+    )) %>%
+mutate(expected_prob = 1/(1+(exp(-y_var))))                   
+
+# creamos la figura 1
+library(ggplot2)
+figure_1 <- ggplot(data_plot_figure_1,  
+  aes(                                  
+    x = ses_grp,                        
+    y = expected_prob,                  
+    group = ach_grp,                    
+    color = ach_grp,                    
+    shape = ach_grp                     
+    )) +                                
+geom_line() +                           
+geom_point(size=4) +                    
+scale_color_manual(                     
+  values = c(                           
+    'Alto Logro Académico (+2 SD)' = 'red',                 
+    'Bajo Logro Académico (-2 SD)' = 'black'                 
+    )) +                                
+scale_shape_manual(                     
+  values = c(                           
+    'Alto Logro Académico (+2 SD)' = 19,                    
+    'Bajo Logro Académico (-2 SD)' = 15                      
+    )) +                                
+xlab('Nivel socioeconómico de las familias (puntaje z)') + 
+scale_y_continuous(                     
+  name = 'Probabilidad de deserción escolar', 
+  breaks = seq(0,1,.1),                 
+  limits = c(0,.6)                      
+  ) +                                    
+theme_bw() +                             
+theme(                                   
+  legend.title = element_blank(),        
+  panel.grid.major.x = element_blank(),  
+  panel.grid.minor.y = element_blank(),  
+  panel.grid.major.y =                              
+  element_line(linewidth = .25, colour = "grey70")  
+  ) +
+ggtitle(
+  'Figura 1: Probabilidades de deserción escolar condicionales a valores ± 2 DS para NSE y Logro académico')                                                 
+
+
+figure_1
+
+```
+
+# 7. Descripcion de resultados
+
+Usualmente, la estructura de descripcion de resultados de un modelo lineal generalizado posee los siguientes componentes:
+
+- Un párrafo con la descripción del ajuste del modelo.
+  + Se emplean estrategias de comparación de modelos entre sí para evaluar el ajuste global del modelo, mediante Likelihood ratio test.
+  + Se pueden emplear indicadores de varianza explicada (e.g., McFadden $R^2$)
+  + Se emplean tambien indicadores de precision de clasificación (i.e., count $R^2$)
+- Párrafos describiendo los resultados encontrados, segun las preguntas de investigación.
+  + En general, los autores se centran los coeficientes que abordan sus preguntas de investigación.
+- Se emplean tablas y gráficos para ilustrar los resultados
+  + Los autores emplean en general al menos una tabla, y a veces figuras de resultados para facilitar la lectura de sus resultados.
+
+::: {.callout-note title="Nota"}
+Para que resultados descritos tengan sentido esbozamos una introducción breve. Esta sigue la estructura de tres partes recomendada por Booth et al (2016). Esta introducción requiere incluir tres partes: una descripción del tópico, una descripción del problema, y una descripción de la propuesta. Emplearemos este formato de introducción de modo que los resultados descritos sean lo más realista posible, ya que es el problema de investigación lo que condiciona a como son descritos los resultados encontrados.
+:::
+
+
+## Introducción
+
+- El dropout escolar es un problema reconocido en términos de política pública para los paises. Es uno de los riesgo negativos más grandes en salud pública (Freudenberg et al., 2007), así como un conocido factor detrimental para la empleabilidad futura de las persoas (Solga, 2002). Este fenómeno interrumpe el proceso educativo del cual participan los estudiantes, y mientras más temprano ocurra, mayores son las consecuenci
+
+- Los indicadores de riesgo con mayor cobertura en el estudio de dropout escolar, es el desempeño académico de los estudiantes, y el nivel socioeconómico de las familias de los estudiantes. Sin embargo, una pregunta que posee menor cobertura en la literatura son los posibles efectos de interacción de estos factores. Esta pregunta es común que no sea abordada en estudios previos, debido a la falta de poder estadístico (e.g., Sommet, 2023). Mientras la evaluación de relaciones entre variables requiere de muestras de unos 100 casos, para la adecuada evaluación relaciones condicionales se puede requerir de muestras de hasta 16 veces el tamaño anterior (Gellman, 2008).
+
+- El presente estudio se sirve de una muestra de datos nacional de gran tamaño (n = 16610) para estudiar el rol del nivel socioeconómico de los estudiantes sobre el dropout escolar. En particular, queremos saber si este factor es un factor de riesgo para todos los estudiantes, y/o si es un factor de riesgo que posee mayores consecuencias para estudiantes de menor desempeño académico.
+
+## Método
+
+- [aqui iría la descripción de la muestra, las variables empleadas, y el tipo de modelo de estadístico empleado para producir los resultados empleados en la argumentación del artículo].
+
+## Resultados
+
+_**Ajuste global**_. El modelo final, en contraste al modelo nulo presenta un mejor ajuste (LRT(3) = 1921.72, p < .001). Este modelo reduce el error del modelo nulo en cerca de 19% (McFadden Adj $R^2$ = 0.19). El modelo clasifica de forma adecuada a 91% de las observaciones (count $R^2$ = .01). Con estos resultados concluimos, que en forma global, el desempeño académico de los estudiantes en octavo grado, y los antecedentes socioeconómicos de las familias, son relevantes para entender la tasa de deserción escolar de los estudiantes secundarios.
+
+_**Resultados**_. 
+
+En terminos generales, se observa que entre  los estudiantes incluidos en el estudios, se observa una tasa de deserción escolar de 8.89%.
+
+Con los resultados obtenidos del modelo ajustado podemos indicar que los estudiantes con mayores logros académicos al inicio de la ventana de observación presentan menores chances de interrumpir su trayectoria escolar (b = -3.17 (0.05), p < .001, OR = .31). En términos relativos, esto indica que los estudiantes con 1 desviación estandar mayor de desempeño académico, tienen 3 veces más chances de concluir sus estudios de secundaria, que el resto de sus pares (1/OR = 3.23).
+
+Por su parte, el nivel socioeconómico de las familias de los estudiantes tambien presenta una relación negativa con la deserción escolar (b = -1.17 (0.05), p < .001, OR = .42; 1/OR = 2.36). Estudiantes de familias con mayor nivel socioeconómico presentan mayores chances de completar sus estudios escolares. En terminos relativos, estudiantes a una desviación estándar de mayor nivel socioeconómico, presentan más del doble de chances de completar sus estudios escolares (1/OR = 2.36).
+
+
+```{r, echo = TRUE, eval = TRUE}
+#| code-fold: true
+#| code-summary: "Código que genera a la Tabla 1 de resultados"
+
+
+# metodo 4: broom::tidy() y edición de campus
+
+## función para decinir 2 decimales
+decimales <- function (x, k) {
+    format(round(x, k), nsmall = k)
+}
+
+
+## tabla con estimados
+tabla_1 <- broom::tidy(m04) %>%
+mutate(text = case_when(
+term == '(Intercept)' ~ 'intercepto',
+term == 'zach'        ~ 'logro académico (puntaje z)',
+term == 'zses'        ~ 'nivel socioeconómico (puntaje z)',
+term == 'int'         ~ 'interacción'
+)) %>%
+mutate(e  = decimales(estimate, 2)) %>%
+mutate(se = paste0('(', decimales(std.error, 2), ')')) %>%
+mutate(star = case_when(
+p.value <  .001 ~ '***',
+p.value <  .01  ~ '** ',
+p.value <  .05  ~ '*  ',
+p.value >= .05  ~ '   '
+)) %>%
+mutate(odds_ratio = decimales(exp(estimate),2))  %>%
+mutate(reverse_odds_ratio = decimales(1/exp(estimate),2))  %>%
+mutate(odds_ratio = case_when(
+text == 'intercepto' ~ '',
+text != 'intercepto' ~ odds_ratio
+)) %>%
+mutate(reverse_odds_ratio = case_when(
+text == 'intercepto' ~ '',
+text != 'intercepto' ~ reverse_odds_ratio
+)) %>%
+dplyr::select(text, e, se, star, odds_ratio, reverse_odds_ratio)
+
+tabla_1 %>%
+knitr::kable(., digits = 2, caption = 'Tabla 1: resultados de regresión logística sobre el evento de deserción escolar')    
+
+
+```
+
+Finalmente, observamos que estos dos factores, desempeño académico en 8vo grado, y nivel socioeconómico de las familias, son factores que interactúan entre sí (b = -0.21 (0.05), p < .001). Para ilustrar la dirección de estos resultados, vamos a producir probabilidades condicionales a -2 y 2 desviaciones estándar por sobre el promedio para desempeño académico, y nivel socioeconómico de las familias, e ilustraremos estos resultados con la Figura 1.
+
+```{r, echo = TRUE, eval = TRUE}
+#| code-fold: true
+#| code-summary: "Código que genera a la Figura 1 para ilustrar la Interacción"
+
+
+# valores de interés
+lo_ach <- -2
+hi_ach <-  2
+lo_ses <- -2
+hi_ses <-  2
+
+# coeficientes en logits del modelo
+b0 <- -3.174
+b1 <- -1.174
+b2 <- -0.857
+b3 <- -0.209
+
+# logits esperados a cada conjunto de valores de interés
+e_logit_1 <- b0 + b1*(lo_ach) + b2*(lo_ses) + b3*(lo_ach*lo_ses)
+e_logit_2 <- b0 + b1*(lo_ach) + b2*(hi_ses) + b3*(lo_ach*hi_ses)
+e_logit_3 <- b0 + b1*(hi_ach) + b2*(lo_ses) + b3*(hi_ach*lo_ses)
+e_logit_4 <- b0 + b1*(hi_ach) + b2*(hi_ses) + b3*(hi_ach*hi_ses)
+
+
+# creamos tabla básica con los logits esperados
+data_plot <- data.frame(     
+x_var = c('Bajo NSE (-2 DS)',
+          'Alto NSE (+2 DS)',
+          'Bajo NSE (-2 DS)',
+          'Alto NSE (+2 DS)'),       
+y_var = c(e_logit_1, e_logit_2, e_logit_3, e_logit_4),
+group = c('Bajo Logro Académico (-2 SD)', 
+          'Bajo Logro Académico (-2 SD)', 
+          'Alto Logro Académico (+2 SD)',
+          'Alto Logro Académico (+2 SD)')
+)                                                     
+
+# reordenamos a los valores del factor ses
+data_plot_figure_1 <- data_plot %>%                           
+mutate(ses_grp = as.factor(x_var)) %>%                        
+mutate(ses_grp =                                              
+  forcats::fct_relevel(ses_grp,
+    c('Bajo NSE (-2 DS)', 'Alto NSE (+2 DS)')
+    )) %>%                                                    
+mutate(ach_grp = as.factor(group)) %>%                        
+mutate(ach_grp =                                              
+  forcats::fct_relevel(ach_grp,
+    c('Bajo Logro Académico (-2 SD)', 
+      'Alto Logro Académico (+2 SD)')
+    )) %>%
+mutate(expected_prob = 1/(1+(exp(-y_var))))                   
+
+# creamos la figura 1
+library(ggplot2)
+figure_1 <- ggplot(data_plot_figure_1,  
+  aes(                                  
+    x = ses_grp,                        
+    y = expected_prob,                  
+    group = ach_grp,                    
+    color = ach_grp,                    
+    shape = ach_grp                     
+    )) +                                
+geom_line() +                           
+geom_point(size=4) +                    
+scale_color_manual(                     
+  values = c(                           
+    'Alto Logro Académico (+2 SD)' = 'red',                 
+    'Bajo Logro Académico (-2 SD)' = 'black'                 
+    )) +                                
+scale_shape_manual(                     
+  values = c(                           
+    'Alto Logro Académico (+2 SD)' = 19,                    
+    'Bajo Logro Académico (-2 SD)' = 15                      
+    )) +                                
+xlab('Nivel socioeconómico de las familias (puntaje z)') + 
+scale_y_continuous(                     
+  name = 'Probabilidad de deserción escolar', 
+  breaks = seq(0,1,.1),                 
+  limits = c(0,.6)                      
+  ) +                                    
+theme_bw() +                             
+theme(                                   
+  legend.title = element_blank(),        
+  panel.grid.major.x = element_blank(),  
+  panel.grid.minor.y = element_blank(),  
+  panel.grid.major.y =                              
+  element_line(linewidth = .25, colour = "grey70")  
+  ) +
+ggtitle(
+  'Figura 1: Probabilidades de deserción escolar condicionales a valores ± 2 DS para NSE y Logro académico')                                                 
+
+
+figure_1
+
+
+
+```
+
+A medida que aumentan los valores de nivel socioeconómico de las familias, la distancia de las probabilidades condicionales de deserción escolar, disminuyen entre los estudiantes de bajo y alto desempeño escolar. Finalmente, el nivel socioeconómico de las familias *acelera* la relación que observamos del desempeño académico a la deserción escolar. De tal forma que los estudiantes de familias de menor nivel socieconómico, presentan mayores chances de deserción escolar, escolar entre los estuddiantes de menores niveles de logro académico, en contraste a sus pares que presentan mayor logro académico. 
+
+
+# Referencias
+
+Booth, W. C., Colomb, G. G., Williams, J. M., Bizup, J., & FitzGerald, W. T. (2016). The Craft of Research (4th ed.). University of Chicago Press. https://doi.org/10.7208/chicago/9780226239873.001.0001
+
+Hemmert, G. A. J., Schons, L. M., Wieseke, J., & Schimmelpfennig, H. (2018). Log-likelihood-based Pseudo-R2 in Logistic Regression: Deriving Sample-sensitive Benchmarks. Sociological Methods and Research, 47(3), 507–531. https://doi.org/10.1177/0049124116638107
+
+Huck, S. W. (2012). Bivariate, Multiple, and Logistic Regression. In Reading Statistics and Research (6th ed., pp. 367–403). Pearson Education.
+
+Lüdecke, D., Ben-Shachar, M., Patil, I., Waggoner, P., & Makowski, D. (2021). performance: An R Package for Assessment, Comparison and Testing of Statistical Models. Journal of Open Source Software, 6(60), 3139. https://doi.org/10.21105/joss.03139
+
+Ma, Z., & Redmond, R. L. (1995). Tau Coefficients for Accuracy Assessment of Classification of Remote Sensing Data. Photogrammetric Engineering and Remote Sensing, 61(4), 435–439.
+
+Niu, L. (2020). A review of the application of logistic regression in educational research: common issues, implications, and suggestions. Educational Review, 72(1), 41–67. https://doi.org/10.1080/00131911.2018.1483892
+
+O’Connell, A. A., & Amico, K. R. (2019). Logistic Regression and Extensions. In The Reviewer’s Guide to Quantitative Methods in the Social Sciences (2nd ed., pp. 214–234). Routledge. https://doi.org/10.4324/9781315755649-16
+
+Osborne, J. W. (2012). Logits and tigers and bears , oh my! A brief look at the simple math of logistic regression and how it can improve dissemination of results. Practical Assessment, Research and Evaluation, 17(June 2012), 1–10.
+
+Sommet, N., Weissman, D. L., Cheutin, N., & Elliot, A. J. (2023). How Many Participants Do I Need to Test an Interaction? Conducting an Appropriate Power Analysis and Achieving Sufficient Power to Detect an Interaction. Advances in Methods and Practices in Psychological Science, 6(3). https://doi.org/10.1177/25152459231178728
+
+
+
+# Anexos
+
+## Colinealidad
+
+```{r, echo = TRUE, eval = TRUE}
+
+blorr::blr_vif_tol(m04)
+
+```
+
+## Diagnóstico de residuales
+
+```{r, echo = TRUE, eval = TRUE}
+
+plot <- blorr::blr_plot_residual_fitted(m04)
+blorr::blr_plot_deviance_residual(m04)
+
+
+broom::augment(m04) %>%
+dplyr::filter(abs(.std.resid) > 3)
+
+
+```
+
+## Efectos marginales (Average Marginal Effects)
+
+```{r, echo = TRUE, eval = TRUE}
+
+# efectos marginales (average marginal effects)
+marginaleffects::avg_slopes(m04)
+
+```
