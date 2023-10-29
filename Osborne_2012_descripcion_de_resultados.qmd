@@ -1,6 +1,6 @@
 ---
 title: "Regresión logística en R"
-subtitle: "Descripción de resultados, empleando datos presentes en Osborne (2012)"
+subtitle: "Descripción de resultados empleando datos presentes en Osborne (2012)"
 toc: true
 toc-expand: true
 toc-title: Contenidos
@@ -34,6 +34,13 @@ options(knitr.kable.NA = '')
 options(dplyr.summarise.inform = FALSE)
 
 ```
+# Resumen
+
+- La siguiente guía produce todos los pasos empleando R para abrir los datos, preparar los datos, ajustar modelos de regresión logística, y describir los resultados encontrados.
+
+- Este documento incluye diferentes secciones donde se ilustran los diferentes pasos que se pueden emplear para producir los resultados.
+
+- Para dirigirse específicamente a la descripción de [resultados](#texto_resultados), hacer [click aqui](#texto_resultados).
 
 # Introducción
 
@@ -48,7 +55,7 @@ Los datos que se emplean en la present guía, pueden ser obtenidos empleando el 
 - [https://www.dropbox.com/s/s1y0qkn8vuebqvr/NELS_data_pulll_2.SAV?dl=0](https://www.dropbox.com/s/s1y0qkn8vuebqvr/NELS_data_pulll_2.SAV?dl=0)
 
 
-Para describir los resultados, se siguen cómo guía a las recomendaciones presentes en Huck (2012), O’Connell et al. (2019), y las observaciones Niu (2020), a la practica del reporte de resultados encontrados en la literatura de la investigación educacional.
+Para describir los resultados, se siguen cómo guía a las recomendaciones presentes en Huck (2012), O’Connell et al. (2019), y las observaciones Niu (2020), a la pra´ctica del reporte de resultados encontrados en la literatura de la investigación educacional.
 
 >done!
 
@@ -471,7 +478,7 @@ No obstante, si el uso de estos indicadores, es solo comparación entre modelos 
 
 O'Connel et al. (2019) por su parte, plantea que el indicador McFadden $R^2$ es uno de los indicadores más intuitivos como medida de mejora de ajuste, dado el modelo de interés.
 
-De todas formas, lo más importante a tener en cuenta, es el propósito para el cual se quiera emplear uno de estos indicadores, e indicar claramente cual es el indicador que esta siendo empleado (Menard, 2000; Hemmert et al., 2018). En otras palabras, la recomendación a seguir es siempre reportar el ajuste del modelo, indicando explicitamente cuál de estos indicadores esta siendo empleado.
+De todas formas, lo más importante a tener en cuenta, es el propósito para el cual se quiera emplear uno de estos indicadores, e indicar claramente cual es el indicador que esta siendo empleado en el reporte de resultados del manuscrito (Menard, 2000; Hemmert et al., 2018). En otras palabras, la recomendación a seguir es siempre reportar el ajuste del modelo, indicando explícitamente cuál de estos indicadores es el reportado.
 
 ::: {.callout-tip title="Tip"}
 En el reporte de resultado de regresión logística, en el primer párrafo de descripción de resultados sobre el ajuste de modelo, se requiere indicar claramente el indicador de pseudo $R^2$ que esta siendo reportado.
@@ -483,7 +490,7 @@ Uno de los indicadores más sencillos de calidad de clasificación es la proporc
 
 Coincide, que para el caso de regresión logistica, este es el mismo indicador de cantidad de clasificaciones correctas o *Count* $R^2$. 
 
-Otro indicador de clasificación, es el indicador $tau_{p}$ Menard (2000, 2002). Este es un indicador, basado en clasificaciones basadas en probabilidades no simétricas (Ma & Redmond, 1995). Este indicador consiste en la proporción de clasificaciones correctas ajustando por las probabilidades a priori. Es decir, la tasa de prevalencia del evento, previo a que tengamos información de las covariables. Este segundo término se obtiene como las probabilidades marginales de la distribución de referencia (i.e., el porcentaje del evento de interes, obtenido desde la variable e respuesta). En la literatura de clasificación este indicador tambien se lo conoce como Klecka's $\tau$. De forma análoga, tambien es posible producir $\tau_{e}$, el cual ajusta las clasificaciones empleando una clasificación al azar. La cual, en el caso del modelo de regresión logística es equivalente a .5 (1/cantidad de valores posibles).
+Otro indicador de clasificación, es el indicador $tau_{p}$ Menard (2000, 2001). Este es un indicador, basado en clasificaciones basadas en probabilidades no simétricas (Ma & Redmond, 1995). Este indicador consiste en la proporción de clasificaciones correctas ajustando por las probabilidades a priori. Es decir, la tasa de prevalencia del evento, previo a que tengamos información de las covariables. Este segundo término se obtiene como las probabilidades marginales de la distribución de referencia (i.e., el porcentaje del evento de interes, obtenido desde la variable e respuesta). En la literatura de clasificación este indicador tambien se lo conoce como Klecka's $\tau$ (Klecka, 1980). De forma análoga, tambien es posible producir $\tau_{e}$, el cual ajusta las clasificaciones empleando una clasificación al azar. La cual, en el caso del modelo de regresión logística es equivalente a .5 (1/cantidad de valores posibles).
 
 A continuación, incluimos código para producir a los indicadores de:
 
@@ -647,9 +654,14 @@ openxlsx::write.xlsx(.,
 
 ```
 
-
-
 # 6. Figura
+
+Empleamos el siguiente código para producir una figura que emplea a las probabilidades condicionales, generadas con los resultados del modelo a ± 2 DS para nivel socioeconómico de las familias, y para logro académico de los estudiantes.
+
+::: {.callout-note title="Nota"}
+El código siguiente es una versión adaptada del código que empleamos en la guía anterior (ver [link](https://www.dropbox.com/scl/fi/v97na2zc4qdrs97oaa9og/Osborne_2012_output_r_anotado.html?rlkey=g8m8741n1x7bpkndq9ixpobz8&dl=1)). En este caso, empleamos *labels* en castellano; mientras que la guía anterior nos enfocamos en reproducir los pasos empleados por Osborne (2012).
+:::
+
 
 **Código 6.** producir figura de resultados esperados
 
@@ -776,13 +788,11 @@ Para que resultados descritos tengan sentido esbozamos una introducción breve. 
 
 - [aqui iría la descripción de la muestra, las variables empleadas, y el tipo de modelo de estadístico empleado para producir los resultados empleados en la argumentación del artículo].
 
-## Resultados
+## Resultados {#texto_resultados}
 
 _**Ajuste global**_. El modelo final, en contraste al modelo nulo presenta un mejor ajuste (LRT(3) = 1921.72, p < .001). Este modelo reduce el error del modelo nulo en cerca de 19% (McFadden Adj $R^2$ = 0.19). El modelo clasifica de forma adecuada a 91% de las observaciones (count $R^2$ = .01). Con estos resultados concluimos, que en forma global, el desempeño académico de los estudiantes en octavo grado, y los antecedentes socioeconómicos de las familias, son relevantes para entender la tasa de deserción escolar de los estudiantes secundarios.
 
-_**Resultados**_. 
-
-En terminos generales, se observa que entre  los estudiantes incluidos en el estudios, se observa una tasa de deserción escolar de 8.89%.
+_**Resultados**_. En terminos generales, se observa que entre  los estudiantes incluidos en el estudios, se observa una tasa de deserción escolar de 8.89%.
 
 Con los resultados obtenidos del modelo ajustado podemos indicar que los estudiantes con mayores logros académicos al inicio de la ventana de observación presentan menores chances de interrumpir su trayectoria escolar (b = -3.17 (0.05), p < .001, OR = .31). En términos relativos, esto indica que los estudiantes con 1 desviación estandar mayor de desempeño académico, tienen 3 veces más chances de concluir sus estudios de secundaria, que el resto de sus pares (1/OR = 3.23).
 
@@ -938,18 +948,32 @@ figure_1
 
 A medida que aumentan los valores de nivel socioeconómico de las familias, la distancia de las probabilidades condicionales de deserción escolar, disminuyen entre los estudiantes de bajo y alto desempeño escolar. Finalmente, el nivel socioeconómico de las familias *acelera* la relación que observamos del desempeño académico a la deserción escolar. De tal forma que los estudiantes de familias de menor nivel socieconómico, presentan mayores chances de deserción escolar, escolar entre los estuddiantes de menores niveles de logro académico, en contraste a sus pares que presentan mayor logro académico. 
 
+::: {.callout-note title="Nota"}
+En el siguiente [link](https://www.dropbox.com/scl/fi/w1tpynr8qt5aj51n4y4v9/tabla_1_resultados.xlsx?rlkey=8o1m3hy91wpyfhyxp71i8sdqz&dl=1), se puede bajar la tabla de resultados generadas en excel, y también en editada en un [formato tipo APA](https://www.dropbox.com/scl/fi/7ibgh6gcjpj2luagohsde/tabla_1_resultados_apa_format.xlsx?rlkey=9o5kmxtowqa9n0oxt9i11tgfg&dl=1).
+:::
+
 
 # Referencias
 
 Booth, W. C., Colomb, G. G., Williams, J. M., Bizup, J., & FitzGerald, W. T. (2016). The Craft of Research (4th ed.). University of Chicago Press. https://doi.org/10.7208/chicago/9780226239873.001.0001
 
+Dunn, P. K., & Smyth, G. K. (2018). Generalized Linear Models With Examples in R. In Springer New York, NY. Springer New York. https://doi.org/10.1007/978-1-4419-0118-7
+
+Harrell, F. E. (2015). Regression Modeling Strategies. Springer International Publishing. https://doi.org/10.1007/978-3-319-19425-7
+
+Heiss, A. (2022). Marginalia: A guide to figuring out what the heck marginal effects, marginal slopes, average marginal effects, marginal effects at the mean, and all these other marginal things are (pp. 1–56). https://doi.org/10.59350/40xaj-4e562
+
 Hemmert, G. A. J., Schons, L. M., Wieseke, J., & Schimmelpfennig, H. (2018). Log-likelihood-based Pseudo-R2 in Logistic Regression: Deriving Sample-sensitive Benchmarks. Sociological Methods and Research, 47(3), 507–531. https://doi.org/10.1177/0049124116638107
 
 Huck, S. W. (2012). Bivariate, Multiple, and Logistic Regression. In Reading Statistics and Research (6th ed., pp. 367–403). Pearson Education.
 
+Klecka, W. (1980). Discriminant Analysis. SAGE Publications Inc.
+
 Lüdecke, D., Ben-Shachar, M., Patil, I., Waggoner, P., & Makowski, D. (2021). performance: An R Package for Assessment, Comparison and Testing of Statistical Models. Journal of Open Source Software, 6(60), 3139. https://doi.org/10.21105/joss.03139
 
 Ma, Z., & Redmond, R. L. (1995). Tau Coefficients for Accuracy Assessment of Classification of Remote Sensing Data. Photogrammetric Engineering and Remote Sensing, 61(4), 435–439.
+
+Menard, S. (2000). Coefficients of determination for multiple logistic regression analysis. American Statistician, 54(1), 17–24. https://doi.org/10.1080/00031305.2000.10474502
 
 Niu, L. (2020). A review of the application of logistic regression in educational research: common issues, implications, and suggestions. Educational Review, 72(1), 41–67. https://doi.org/10.1080/00131911.2018.1483892
 
@@ -963,29 +987,86 @@ Sommet, N., Weissman, D. L., Cheutin, N., & Elliot, A. J. (2023). How Many Parti
 
 # Anexos
 
-## Colinealidad
+## Anexo 1: Colinealidad
+
+La librería `blorr` provee de una función directa para diagnosticas la posible colinealidad de las covariables. En general, se esperan valores menores a 4 en el indicador VIF (i.e., *variance inflation factor*). Para mayores detalles de como VIF puede afectar a los errores de un modelo ver la siguiente nota en [stackexchange](https://stats.stackexchange.com/questions/342161/how-do-i-know-what-my-vif-limits-should-be-for-collinearity-should-be-when-doing).
 
 ```{r, echo = TRUE, eval = TRUE}
 
 blorr::blr_vif_tol(m04)
 
 ```
+## Anexo 2: Residuales
 
-## Diagnóstico de residuales
+Existen diferentes tipos de residuales en el caso de la regresión logistica (ver Dunn, et al. (2018), p299). Uno de los más intuitivos son los residuales basados en devianzas, que se encuentran *unit deviance*, y son los que produce por defecto el paquete base de R (i.e., `residual(model)`), para el caso de modelo de regresion logística.
 
 ```{r, echo = TRUE, eval = TRUE}
 
-plot <- blorr::blr_plot_residual_fitted(m04)
+# residuales basados en devianza
 blorr::blr_plot_deviance_residual(m04)
 
+```
+De forma muy intuitiva, se pueden hacer dos cosas con los residuales. Lo primero es que es más conveniente que estos se distribuyan de forma similar a entre las observaciones. De caso contrario, uno puede sospechar que el modelo ajusta de mejor manera para algunas observaciones, en contraste a otras.
 
-broom::augment(m04) %>%
-dplyr::filter(abs(.std.resid) > 3)
+Harrel (2015) es de la opinión que el diagnóstico general de lo residuales de los modelos de regresión logística es menos util, que en el caso de la regresión lineal. Lo anterior, porque el modelo no posee una distribución esperada para los residuales (e.g., por ejemplo una distrivución normal). En terminos más generales la regresión logística no posee un modelo para los errores, como en el caso de la regresión lineal.
+
+Por su parte Dunn et al. (2018, p228) muestra los residuales de la unidad de devianza (i.e., *unit deviance*), que es la escala que en se encuentran los residuales que produce por defecto, poseen una distribución cercana $\chi^2$. Y estos valores debieran ser cercanos a 1; sin embargo si la prevancia de $Pr(y=1)$ es muy alta o muy baja (menor a .1, o mayor .9), las devianzas esperadas se *empinan* y pueden ser mayores a 1.
+
+En el modelo ajustado, esto es precisamete lo que sucede, ya que estamos modelando una variable de respuesta donde se observa $Pr(y=1) = .09$. En este caso observamos varios casos son residuales por sobre 1 entre los valores que presentan el evento. 
+
+
+```{r, echo = TRUE, eval = TRUE}
+
+# figura comparada
+library(ggplot2)
+plot_1 <- broom::augment(m04) %>%
+dplyr::filter(drop == 0) %>%
+ggplot(., aes(x=.resid)) + 
+geom_histogram() +
+theme_bw() +
+theme(                                   
+  legend.title = element_blank(),        
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),  
+  panel.grid.minor.y = element_blank(),  
+  panel.grid.major.y = element_blank()
+  )     +
+xlab('Residuales (Deviance)')
+
+plot_2 <- broom::augment(m04) %>%
+dplyr::filter(drop == 1) %>%
+ggplot(., aes(x=.resid)) + 
+geom_histogram() +
+theme_bw() +
+theme(                                   
+  legend.title = element_blank(),        
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),  
+  panel.grid.minor.y = element_blank(),  
+  panel.grid.major.y = element_blank()
+  )     +
+xlab('Residuales (Deviance)')
+
+# reorganizar las figuras generadas
+plot_in_wide <- cowplot::plot_grid(
+    plot_1 + 
+      ggtitle('Residuales entre\nobservaciones que no presentan el evento') + 
+      theme(legend.position = 'none'),
+    plot_2 + 
+      ggtitle('Residuales entre\nobservaciones que sí presentan el evento') + 
+      theme(legend.position = 'none'),
+    ncol=2, nrow = 1
+  )
+
+# mostrar a las figuras generadas
+plot_in_wide
 
 
 ```
 
-## Efectos marginales (Average Marginal Effects)
+## Anexo 3: Efectos marginales (Average Marginal Effects)
+
+Como fuera visto en clase podemos obtener los *efectos marginales*, en particular los *average marginal effects*. Estos nos entregan el *cambio* esperado en escala de probabilidad, por sobre el promedio, para cada unidad sobre cada covariable del mdoelo. Sin embargo, en esta guía empleamos probabilidades condicionales esperadas a valores particulares para ilustrar los resultados esperados, siguiendo a Osborne (2012).
 
 ```{r, echo = TRUE, eval = TRUE}
 
@@ -993,3 +1074,5 @@ dplyr::filter(abs(.std.resid) > 3)
 marginaleffects::avg_slopes(m04)
 
 ```
+
+Para más detalles de que son estas probabilidades condicionales, y como se obvtienen se recomienda consultar [Heiss (2018)](https://www.andrewheiss.com/blog/2022/05/20/marginalia/).
